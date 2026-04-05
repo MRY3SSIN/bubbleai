@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 
 import { AppCard } from '@/src/components/AppCard';
 import { SegmentedControl } from '@/src/components/SegmentedControl';
@@ -12,24 +12,26 @@ import { colors, spacing, typography } from '@/src/theme';
 
 export default function CheckinsHubScreen() {
   const router = useRouter();
+  const { width } = useWindowDimensions();
   const [segment, setSegment] = useState<'analysis' | 'journals'>('analysis');
   const { data: journalEntries } = useJournalEntries();
   const checkins = useAppStore((state) => state.checkins);
+  const isCompact = width < 390;
 
   return (
     <Screen>
       <SectionHeader eyebrow="Sunday, 29 December" title="Self Assessment" />
-      <View style={styles.quickGrid}>
+      <View style={[styles.quickGrid, isCompact && styles.quickGridCompact]}>
         <Pressable onPress={() => router.push('/checkin/new')} style={styles.gridItem}>
-          <AppCard style={styles.quickCard}>
+          <AppCard style={[styles.quickCard, isCompact && styles.quickCardCompact]}>
             <Text style={styles.icon}>♡</Text>
-            <Text style={styles.quickTitle}>Take Self Analysis</Text>
+            <Text style={[styles.quickTitle, isCompact && styles.quickTitleCompact]}>Take Self Analysis</Text>
           </AppCard>
         </Pressable>
         <Pressable onPress={() => router.push('/journal/new-entry')} style={styles.gridItem}>
-          <AppCard style={styles.quickCard}>
+          <AppCard style={[styles.quickCard, isCompact && styles.quickCardCompact]}>
             <Text style={styles.icon}>📝</Text>
-            <Text style={styles.quickTitle}>Take Journal</Text>
+            <Text style={[styles.quickTitle, isCompact && styles.quickTitleCompact]}>Take Journal</Text>
           </AppCard>
         </Pressable>
       </View>
@@ -73,11 +75,17 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     marginBottom: spacing.xl,
   },
+  quickGridCompact: {
+    flexDirection: 'column',
+  },
   gridItem: {
     flex: 1,
   },
   quickCard: {
     minHeight: 150,
+  },
+  quickCardCompact: {
+    minHeight: 118,
   },
   icon: {
     fontSize: 24,
@@ -86,6 +94,11 @@ const styles = StyleSheet.create({
     color: colors.ink,
     marginTop: spacing.xl,
     ...typography.h2,
+  },
+  quickTitleCompact: {
+    fontSize: 24,
+    lineHeight: 28,
+    marginTop: spacing.lg,
   },
   stack: {
     gap: spacing.md,
@@ -101,4 +114,3 @@ const styles = StyleSheet.create({
     ...typography.body,
   },
 });
-

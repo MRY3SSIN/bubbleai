@@ -6,7 +6,7 @@ import { BackHeader } from '@/src/components/layout/BackHeader';
 import { Screen } from '@/src/components/layout/Screen';
 import { PillButton } from '@/src/components/PillButton';
 import { useAppStore } from '@/src/lib/app-store';
-import { scheduleReminderPreview } from '@/src/lib/notifications';
+import { notificationsSupportedInCurrentRuntime, scheduleReminderPreview } from '@/src/lib/notifications';
 import { colors, spacing, typography } from '@/src/theme';
 
 export default function SettingsScreen() {
@@ -32,8 +32,25 @@ export default function SettingsScreen() {
         <PillButton
           label="Preview reminder"
           onPress={async () => {
-            await scheduleReminderPreview('BubbleAI reminder', 'Take one gentle minute to check in with yourself.');
-            Alert.alert('Scheduled', 'A local preview reminder was created if permissions are available.');
+            const scheduled = await scheduleReminderPreview(
+              'BubbleAI reminder',
+              'Take one gentle minute to check in with yourself.',
+            );
+
+            if (!notificationsSupportedInCurrentRuntime) {
+              Alert.alert(
+                'Use a development build',
+                'Expo Go on Android does not support this notification flow. Install the BubbleAI dev build to test reminders.',
+              );
+              return;
+            }
+
+            if (!scheduled) {
+              Alert.alert('Permission needed', 'Enable notifications first to preview reminder alerts.');
+              return;
+            }
+
+            Alert.alert('Scheduled', 'A local preview reminder was created.');
           }}
           variant="secondary"
         />
@@ -63,4 +80,3 @@ const styles = StyleSheet.create({
     ...typography.body,
   },
 });
-

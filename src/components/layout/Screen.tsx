@@ -4,6 +4,7 @@ import {
   Platform,
   ScrollView,
   StyleSheet,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -24,8 +25,11 @@ export const Screen = ({
   padded = true,
   backgroundColor = colors.background,
 }: ScreenProps) => {
+  const { width } = useWindowDimensions();
+  const horizontalPadding = width < 360 ? spacing.lg : spacing.xl;
+
   const content = (
-    <View style={[styles.content, padded && styles.padded]}>
+    <View style={[styles.content, padded && { paddingHorizontal: horizontalPadding, paddingBottom: spacing.xxxl }]}>
       {header}
       {children}
     </View>
@@ -62,9 +66,4 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
   },
-  padded: {
-    paddingHorizontal: spacing.xl,
-    paddingBottom: spacing.xxxl,
-  },
 });
-

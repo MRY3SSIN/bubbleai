@@ -25,8 +25,9 @@ export const SectionHeader = ({ eyebrow, title, actionLabel, onPressAction }: Se
 
 const styles = StyleSheet.create({
   row: {
-    alignItems: 'center',
+    alignItems: 'flex-start',
     flexDirection: 'row',
+    gap: spacing.md,
     justifyContent: 'space-between',
     marginBottom: spacing.md,
   },
@@ -44,7 +45,7 @@ const styles = StyleSheet.create({
   },
   action: {
     color: colors.inkMuted,
+    paddingTop: 4,
     ...typography.label,
   },
 });
-

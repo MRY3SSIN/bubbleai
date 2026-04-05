@@ -15,16 +15,22 @@ export const MetricTile = ({ title, value, subtitle, icon }: MetricTileProps) =>
     <View style={styles.iconCircle}>
       <Text style={styles.icon}>{icon}</Text>
     </View>
-    <Text style={styles.title}>{title}</Text>
-    <Text style={styles.value}>{value}</Text>
-    <Text style={styles.subtitle}>{subtitle}</Text>
+    <Text numberOfLines={2} style={styles.title}>
+      {title}
+    </Text>
+    <Text numberOfLines={2} style={styles.value}>
+      {value}
+    </Text>
+    <Text numberOfLines={4} style={styles.subtitle}>
+      {subtitle}
+    </Text>
   </AppCard>
 );
 
 const styles = StyleSheet.create({
   card: {
     flex: 1,
-    minHeight: 144,
+    minHeight: 164,
   },
   iconCircle: {
     alignItems: 'center',
@@ -40,17 +46,23 @@ const styles = StyleSheet.create({
   },
   title: {
     color: colors.ink,
+    flexShrink: 1,
     ...typography.h3,
+    fontSize: 20,
+    lineHeight: 24,
   },
   value: {
     color: colors.mint,
+    flexShrink: 1,
     ...typography.h1,
+    fontSize: 32,
+    lineHeight: 36,
     marginTop: spacing.sm,
   },
   subtitle: {
     color: colors.inkMuted,
+    flexShrink: 1,
     ...typography.caption,
     marginTop: spacing.sm,
   },
 });
-

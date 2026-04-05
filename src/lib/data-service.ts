@@ -1,14 +1,18 @@
 import { startTransition } from 'react';
 
-import { formatISO } from 'date-fns';
+import { format, formatISO } from 'date-fns';
 
 import { authService, supabase } from '@/src/lib/auth';
 import { calculateBubbleScore } from '@/src/lib/bubble-score';
 import { generateSessionTitle } from '@/src/lib/chat';
-import { demoAnalytics, demoDashboard, demoMessagesBySession, demoRecommendations, demoVoiceTranscript } from '@/src/lib/demo-data';
+import {
+  demoMessagesBySession,
+  demoRecommendations,
+  demoVoiceTranscript,
+} from '@/src/lib/demo-data';
 import { env } from '@/src/lib/env';
+import { hasLiveSession, useAppStore } from '@/src/lib/app-store';
 import { detectRiskLevel } from '@/src/lib/risk';
-import { useAppStore } from '@/src/lib/app-store';
 import type {
   AnalyticsDetail,
   ChatMessage,
@@ -21,9 +25,368 @@ import type {
   NotificationSettings,
   OnboardingFormValues,
   Recommendation,
+  TrendPoint,
 } from '@/src/types/domain';
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const uuidPattern =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+const isUuid = (value?: string | null) => Boolean(value && uuidPattern.test(value));
+
+const getLiveUserId = () => {
+  if (!hasLiveSession()) {
+    return null;
+  }
+
+  const userId = useAppStore.getState().session?.id;
+  return isUuid(userId) ? userId : null;
+};
+
+const quickActions = [
+  { id: 'qa-analysis', title: 'Take Self Analysis', subtitle: '2 mins', route: '/checkin/new' },
+  { id: 'qa-journal', title: 'Take Journal', subtitle: 'Reflect gently', route: '/journal/new-entry' },
+] as const;
+
+const emptyBubbleScore = {
+  total: 0,
+  mood: 0,
+  stress: 0,
+  sleep: 0,
+  consistency: 0,
+  reflection: 0,
+  explanation:
+    'Your Bubble Score builds from mood, stress, sleep, and how consistently you check in or journal.',
+};
+
+const emptyDashboard = (): DashboardSnapshot => ({
+  greetingDate: format(new Date(), 'EEEE, d MMMM'),
+  bubbleScore: emptyBubbleScore,
+  stressSummary: 'Take your first check-in to start tracking stress gently.',
+  moodSummary: 'Mood patterns will appear once you start logging how you feel.',
+  sleepSummary: 'Sleep trends will show up after a few check-ins.',
+  quickActions: [...quickActions],
+  recentInsights: [],
+});
+
+const moodLabel = (value?: number) => {
+  switch (value) {
+    case 1:
+      return 'Very low';
+    case 2:
+      return 'Low';
+    case 3:
+      return 'Neutral';
+    case 4:
+      return 'Pretty good';
+    case 5:
+      return 'Very pleasant';
+    default:
+      return 'Unknown';
+  }
+};
+
+const buildTrend = (
+  values: number[],
+  labels: string[],
+): TrendPoint[] =>
+  values.map((value, index) => ({
+    label: labels[index] ?? `${index + 1}`,
+    value,
+    highlight: index === values.length - 1,
+  }));
+
+const mapCheckin = (row: {
+  id: string;
+  created_at: string;
+  mood: number;
+  stress: number;
+  energy: number;
+  sleep_hours: number;
+  overwhelm: number;
+  notes?: string | null;
+}): DailyCheckin => ({
+  id: row.id,
+  createdAt: row.created_at,
+  mood: row.mood as DailyCheckin['mood'],
+  stress: row.stress,
+  energy: row.energy,
+  sleep: Number(row.sleep_hours),
+  overwhelm: row.overwhelm,
+  notes: row.notes ?? undefined,
+});
+
+const mapJournal = (row: {
+  id: string;
+  title: string;
+  created_at: string;
+  body?: string | null;
+  voice_transcript?: string | null;
+  summary?: string | null;
+  themes?: unknown;
+  risk_level: JournalEntry['riskLevel'];
+}): JournalEntry => ({
+  id: row.id,
+  title: row.title,
+  createdAt: row.created_at,
+  text: row.body ?? '',
+  transcript: row.voice_transcript ?? undefined,
+  summary: row.summary ?? '',
+  themes: Array.isArray(row.themes) ? (row.themes as string[]) : [],
+  riskLevel: row.risk_level,
+});
+
+const getRecentCheckins = (checkins: DailyCheckin[], count = 7) =>
+  [...checkins]
+    .sort((a, b) => (a.createdAt > b.createdAt ? -1 : 1))
+    .slice(0, count);
+
+const buildWeeklyTrend = (
+  checkins: DailyCheckin[],
+  selector: (checkin: DailyCheckin) => number,
+): TrendPoint[] => {
+  const recent = getRecentCheckins(checkins, 7).reverse();
+  return buildTrend(
+    recent.map(selector),
+    recent.map((checkin) => format(new Date(checkin.createdAt), 'EEE')),
+  );
+};
+
+const averageOf = (values: number[]) =>
+  values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
+
+const buildInsightsFromData = (
+  checkins: DailyCheckin[],
+  journals: JournalEntry[],
+): InsightCard[] => {
+  if (!checkins.length && !journals.length) {
+    return [];
+  }
+
+  const averageStress = averageOf(checkins.map((item) => item.stress));
+  const averageSleep = averageOf(checkins.map((item) => item.sleep));
+  const averageMood = averageOf(checkins.map((item) => item.mood));
+
+  return [
+    {
+      id: 'stress-live',
+      metric: 'stress' as const,
+      title: 'Stress trend',
+      summary:
+        averageStress <= 3
+          ? 'Your recent stress readings look steadier. Keep protecting the small routines that help you recover.'
+          : 'Stress still looks elevated. Short pauses, hydration, and smaller next steps may help bring it down.',
+      period: 'week' as const,
+      chart: buildWeeklyTrend(checkins, (item) => item.stress),
+      accentValue: averageStress ? averageStress.toFixed(1) : '0',
+    },
+    {
+      id: 'sleep-live',
+      metric: 'sleep' as const,
+      title: 'Sleep rhythm',
+      summary:
+        averageSleep >= 7
+          ? 'Your sleep is starting to look more regular, which usually supports mood and focus.'
+          : 'Sleep still looks a bit uneven. A calmer evening routine could help your nights settle.',
+      period: 'week' as const,
+      chart: buildWeeklyTrend(checkins, (item) => item.sleep),
+      accentValue: averageSleep ? `${averageSleep.toFixed(1)} hrs` : '0 hrs',
+    },
+    {
+      id: 'journal-live',
+      metric: 'journal' as const,
+      title: 'Reflection consistency',
+      summary:
+        journals.length >= 3
+          ? 'You have been reflecting consistently, which gives BubbleAI better context for support.'
+          : 'A few more journal entries will help BubbleAI notice themes and spot helpful patterns.',
+      period: 'week' as const,
+      chart: buildTrend(
+        [Math.min(journals.length, 7)],
+        ['This week'],
+      ),
+      accentValue: `${journals.length} entries`,
+    },
+    {
+      id: 'mood-live',
+      metric: 'mood' as const,
+      title: 'Mood pattern',
+      summary:
+        averageMood >= 4
+          ? 'Mood has been leaning positive overall, with signs that your recent habits are helping.'
+          : 'Mood has been mixed lately. More check-ins will help BubbleAI notice what affects it most.',
+      period: 'week' as const,
+      chart: buildWeeklyTrend(checkins, (item) => item.mood),
+      accentValue: moodLabel(Math.round(averageMood)),
+    },
+  ].filter((item) => item.chart.length > 0);
+};
+
+const buildDashboardFromData = (
+  checkins: DailyCheckin[],
+  journals: JournalEntry[],
+): DashboardSnapshot => {
+  if (!checkins.length && !journals.length) {
+    return emptyDashboard();
+  }
+
+  const latest = getRecentCheckins(checkins, 1)[0];
+  const averageSleep = averageOf(checkins.map((item) => item.sleep));
+  const bubbleScore = calculateBubbleScore(checkins, journals);
+
+  return {
+    greetingDate: format(new Date(), 'EEEE, d MMMM'),
+    bubbleScore,
+    stressSummary: latest
+      ? `Latest stress check-in: ${latest.stress}/10. ${latest.stress <= 4 ? 'That looks manageable right now.' : 'There is some pressure showing up.'}`
+      : 'Take your first check-in to start tracking stress gently.',
+    moodSummary: latest
+      ? `Latest mood: ${moodLabel(latest.mood)}. BubbleAI will get sharper as you log more moments.`
+      : 'Mood patterns will appear once you start logging how you feel.',
+    sleepSummary: averageSleep
+      ? `Recent average sleep is ${averageSleep.toFixed(1)} hours.`
+      : 'Sleep trends will show up after a few check-ins.',
+    quickActions: [...quickActions],
+    recentInsights: buildInsightsFromData(checkins, journals).slice(0, 3),
+  };
+};
+
+const buildAnalyticsFromData = (
+  metric: string,
+  checkins: DailyCheckin[],
+  journals: JournalEntry[],
+): AnalyticsDetail => {
+  const bubbleScore = calculateBubbleScore(checkins, journals);
+  const stressTrend = buildWeeklyTrend(checkins, (item) => item.stress);
+  const moodTrend = buildWeeklyTrend(checkins, (item) => item.mood);
+  const sleepTrend = buildWeeklyTrend(checkins, (item) => item.sleep);
+  const averageStress = averageOf(checkins.map((item) => item.stress));
+  const averageMood = averageOf(checkins.map((item) => item.mood));
+  const averageSleep = averageOf(checkins.map((item) => item.sleep));
+  const latest = getRecentCheckins(checkins, 1)[0];
+
+  switch (metric) {
+    case 'sleep':
+      return {
+        metric: 'sleep',
+        title: 'Sleep',
+        value: averageSleep ? `${averageSleep.toFixed(1)} hrs/day` : '0 hrs/day',
+        subtitle: 'Average sleep in the last 14 days',
+        period: 'week',
+        gaugeValue: averageSleep,
+        gaugeMax: 10,
+        trend: sleepTrend,
+        insight: averageSleep >= 7
+          ? 'Your sleep is landing in a steadier range. Keep your evenings simple and consistent.'
+          : 'Sleep is still uneven. A gentler wind-down routine may help bring more consistency.',
+      };
+    case 'stress':
+      return {
+        metric: 'stress',
+        title: 'Stress Level',
+        value: latest ? `${latest.stress}` : '0',
+        subtitle: 'Most recent stress check-in',
+        period: 'week',
+        gaugeValue: latest?.stress ?? 0,
+        gaugeMax: 10,
+        trend: stressTrend,
+        insight: averageStress <= 4
+          ? 'Recent stress looks lighter. Keep leaning on the routines that are helping.'
+          : 'Stress is still showing up regularly. Smaller tasks and shorter recovery breaks may help.',
+      };
+    case 'mood':
+      return {
+        metric: 'mood',
+        title: 'Mood Progress',
+        value: moodLabel(Math.round(latest?.mood ?? averageMood) || 0),
+        subtitle: 'Most recent mood check-in',
+        period: 'week',
+        gaugeValue: latest?.mood ?? averageMood,
+        gaugeMax: 5,
+        trend: moodTrend,
+        insight: averageMood >= 4
+          ? 'Mood has been leaning positive lately.'
+          : 'Mood has been mixed, which means a few more check-ins will help reveal better patterns.',
+      };
+    default:
+      return {
+        metric: 'bubble_score',
+        title: 'Bubble Score',
+        value: `${bubbleScore.total}`,
+        subtitle: 'Overall progress',
+        period: 'week',
+        gaugeValue: bubbleScore.total,
+        gaugeMax: 300,
+        trend: buildTrend(
+          getRecentCheckins(checkins, 7)
+            .reverse()
+            .map((_, index, items) =>
+              calculateBubbleScore(
+                getRecentCheckins(checkins, items.length - index).reverse(),
+                journals,
+              ).total,
+            ),
+          getRecentCheckins(checkins, 7)
+            .reverse()
+            .map((item) => format(new Date(item.createdAt), 'EEE')),
+        ),
+        insight: bubbleScore.explanation,
+      };
+  }
+};
+
+const buildRecommendationsFromData = (
+  checkins: DailyCheckin[],
+  journals: JournalEntry[],
+): Recommendation[] => {
+  const latest = getRecentCheckins(checkins, 1)[0];
+
+  if (!latest) {
+    return [
+      {
+        id: 'rec-first-checkin',
+        kind: 'journal',
+        title: 'Start with a check-in',
+        description: 'A quick check-in helps BubbleAI understand your stress, mood, and sleep more clearly.',
+      },
+    ];
+  }
+
+  const recommendations: Recommendation[] = [];
+
+  if (latest.stress >= 6) {
+    recommendations.push({
+      id: 'rec-breathing',
+      kind: 'breathing',
+      title: 'Try one slow reset',
+      description: 'Take 60 seconds for a slower breath and a small pause before the next task.',
+    });
+  }
+
+  if (latest.sleep < 7) {
+    recommendations.push({
+      id: 'rec-sleep',
+      kind: 'sleep',
+      title: 'Protect your bedtime',
+      description: 'Try a lighter evening routine tonight so your body gets a clearer signal to wind down.',
+    });
+  }
+
+  if (journals.length < 2) {
+    recommendations.push({
+      id: 'rec-journal',
+      kind: 'journal',
+      title: 'Write one short note',
+      description: 'One honest sentence about how today feels can be enough to spot patterns over time.',
+    });
+  }
+
+  if (!recommendations.length) {
+    recommendations.push(...demoRecommendations.slice(0, 2));
+  }
+
+  return recommendations.slice(0, 3);
+};
 
 const assistantReply = (message: string) => {
   const risk = detectRiskLevel(message);
@@ -51,48 +414,140 @@ const assistantReply = (message: string) => {
   };
 };
 
+const fetchLiveWellnessData = async (userId: string) => {
+  if (!supabase) {
+    return { checkins: [], journals: [] };
+  }
+
+  const [{ data: checkinRows, error: checkinError }, { data: journalRows, error: journalError }] =
+    await Promise.all([
+      supabase
+        .from('daily_checkins')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(14),
+      supabase
+        .from('journal_entries')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(14),
+    ]);
+
+  if (checkinError) {
+    throw checkinError;
+  }
+
+  if (journalError) {
+    throw journalError;
+  }
+
+  return {
+    checkins: (checkinRows ?? []).map(mapCheckin),
+    journals: (journalRows ?? []).map(mapJournal),
+  };
+};
+
 export const dataService = {
   auth: authService,
 
   async getDashboard(): Promise<DashboardSnapshot> {
-    const state = useAppStore.getState();
+    if (env.isMock) {
+      const state = useAppStore.getState();
+      return buildDashboardFromData(state.checkins, state.journalEntries);
+    }
 
-    return {
-      ...demoDashboard,
-      bubbleScore: calculateBubbleScore(state.checkins, state.journalEntries),
-      recentInsights: demoDashboard.recentInsights,
-    };
+    const userId = getLiveUserId();
+    if (!userId) {
+      return emptyDashboard();
+    }
+
+    const { checkins, journals } = await fetchLiveWellnessData(userId);
+    return buildDashboardFromData(checkins, journals);
   },
 
   async listInsights(): Promise<InsightCard[]> {
-    return demoDashboard.recentInsights;
+    if (env.isMock) {
+      const state = useAppStore.getState();
+      return buildInsightsFromData(state.checkins, state.journalEntries);
+    }
+
+    const userId = getLiveUserId();
+    if (!userId) {
+      return [];
+    }
+
+    const { checkins, journals } = await fetchLiveWellnessData(userId);
+    return buildInsightsFromData(checkins, journals);
   },
 
   async getAnalytics(metric: string): Promise<AnalyticsDetail> {
-    return demoAnalytics[metric] ?? demoAnalytics.bubble_score;
+    if (env.isMock) {
+      const state = useAppStore.getState();
+      return buildAnalyticsFromData(metric, state.checkins, state.journalEntries);
+    }
+
+    const userId = getLiveUserId();
+    if (!userId) {
+      return buildAnalyticsFromData(metric, [], []);
+    }
+
+    const { checkins, journals } = await fetchLiveWellnessData(userId);
+    return buildAnalyticsFromData(metric, checkins, journals);
   },
 
   async listNotifications(): Promise<NotificationItem[]> {
-    return useAppStore.getState().notifications;
+    if (env.isMock) {
+      return useAppStore.getState().notifications;
+    }
+
+    return [];
   },
 
   async updateNotificationSettings(settings: Partial<NotificationSettings>) {
     if (!env.isMock && supabase) {
-      const userId = useAppStore.getState().session?.id;
-      if (userId) {
-        const { data, error } = await supabase
-          .from('notification_settings')
-          .upsert({ user_id: userId, ...settings }, { onConflict: 'user_id' })
-          .select('*')
-          .single();
-
-        if (error) {
-          throw error;
-        }
-
-        useAppStore.getState().updateNotificationSettings(settings);
-        return data;
+      const userId = getLiveUserId();
+      if (!userId) {
+        throw new Error('Please sign in again to update notification settings.');
       }
+
+      const { data, error } = await supabase
+        .from('notification_settings')
+        .upsert(
+          {
+            user_id: userId,
+            enabled: settings.enabled,
+            daily_checkin: settings.dailyCheckin,
+            journaling: settings.journaling,
+            bedtime: settings.bedtime,
+            hydration: settings.hydration,
+            movement: settings.movement,
+            quiet_hours_start: settings.quietHoursStart,
+            quiet_hours_end: settings.quietHoursEnd,
+          },
+          { onConflict: 'user_id' },
+        )
+        .select('*')
+        .single();
+
+      if (error) {
+        throw error;
+      }
+
+      const normalized = {
+        enabled: data.enabled,
+        dailyCheckin: data.daily_checkin,
+        journaling: data.journaling,
+        bedtime: data.bedtime,
+        hydration: data.hydration,
+        movement: data.movement,
+        quietHoursStart: data.quiet_hours_start,
+        quietHoursEnd: data.quiet_hours_end,
+      };
+
+      useAppStore.getState().updateNotificationSettings(normalized);
+      return normalized;
     }
 
     useAppStore.getState().updateNotificationSettings(settings);
@@ -101,7 +556,7 @@ export const dataService = {
 
   async getNotificationSettings() {
     if (!env.isMock && supabase) {
-      const userId = useAppStore.getState().session?.id;
+      const userId = getLiveUserId();
       if (userId) {
         const { data } = await supabase
           .from('notification_settings')
@@ -110,7 +565,7 @@ export const dataService = {
           .maybeSingle();
 
         if (data) {
-          return {
+          const normalized = {
             enabled: data.enabled,
             dailyCheckin: data.daily_checkin,
             journaling: data.journaling,
@@ -120,6 +575,8 @@ export const dataService = {
             quietHoursStart: data.quiet_hours_start,
             quietHoursEnd: data.quiet_hours_end,
           };
+          useAppStore.getState().updateNotificationSettings(normalized);
+          return normalized;
         }
       }
     }
@@ -129,54 +586,44 @@ export const dataService = {
 
   async listJournalEntries() {
     if (!env.isMock && supabase) {
-      const userId = useAppStore.getState().session?.id;
-      if (userId) {
-        const { data, error } = await supabase
-          .from('journal_entries')
-          .select('*')
-          .eq('user_id', userId)
-          .order('created_at', { ascending: false });
-
-        if (error) {
-          throw error;
-        }
-
-        return (data ?? []).map((entry) => ({
-          id: entry.id,
-          title: entry.title,
-          createdAt: entry.created_at,
-          text: entry.body ?? '',
-          transcript: entry.voice_transcript ?? undefined,
-          summary: entry.summary ?? '',
-          themes: Array.isArray(entry.themes) ? entry.themes : [],
-          riskLevel: entry.risk_level,
-        }));
+      const userId = getLiveUserId();
+      if (!userId) {
+        return [];
       }
+
+      const { data, error } = await supabase
+        .from('journal_entries')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        throw error;
+      }
+
+      return (data ?? []).map(mapJournal);
     }
 
     return useAppStore.getState().journalEntries;
   },
 
   async getJournalEntry(entryId: string) {
-    if (!env.isMock && supabase) {
-      const { data, error } = await supabase.from('journal_entries').select('*').eq('id', entryId).maybeSingle();
+    if (!env.isMock && supabase && isUuid(entryId)) {
+      const { data, error } = await supabase
+        .from('journal_entries')
+        .select('*')
+        .eq('id', entryId)
+        .maybeSingle();
 
       if (error) {
         throw error;
       }
 
-      if (data) {
-        return {
-          id: data.id,
-          title: data.title,
-          createdAt: data.created_at,
-          text: data.body ?? '',
-          transcript: data.voice_transcript ?? undefined,
-          summary: data.summary ?? '',
-          themes: Array.isArray(data.themes) ? data.themes : [],
-          riskLevel: data.risk_level,
-        };
-      }
+      return data ? mapJournal(data) : null;
+    }
+
+    if (!env.isMock) {
+      return null;
     }
 
     return useAppStore.getState().journalEntries.find((entry) => entry.id === entryId) ?? null;
@@ -190,37 +637,56 @@ export const dataService = {
     };
 
     if (!env.isMock && supabase) {
-      const userId = useAppStore.getState().session?.id;
-      if (userId) {
-        const { data, error } = await supabase
-          .from('journal_entries')
-          .insert({
-            user_id: userId,
-            title: payload.title,
-            body: payload.text,
-            summary: payload.summary,
-            themes: payload.themes,
-            risk_level: payload.riskLevel,
-            analysis_status: 'complete',
-          })
-          .select('*')
-          .single();
-
-        if (error) {
-          throw error;
-        }
-
-        return {
-          id: data.id,
-          title: data.title,
-          createdAt: data.created_at,
-          text: data.body ?? '',
-          transcript: data.voice_transcript ?? undefined,
-          summary: data.summary ?? '',
-          themes: Array.isArray(data.themes) ? data.themes : [],
-          riskLevel: data.risk_level,
-        } satisfies JournalEntry;
+      const userId = getLiveUserId();
+      if (!userId) {
+        throw new Error('Please sign in again before creating a journal entry.');
       }
+
+      const [moderationResult, riskResult] = await Promise.all([
+        supabase.functions.invoke('moderate-message', {
+          body: { input: payload.text },
+        }),
+        supabase.functions.invoke('classify-risk', {
+          body: { content: payload.text },
+        }),
+      ]);
+
+      const resolvedRisk =
+        riskResult.error || !riskResult.data?.risk_level
+          ? detectRiskLevel(payload.text)
+          : riskResult.data.risk_level;
+
+      const { data, error } = await supabase
+        .from('journal_entries')
+        .insert({
+          user_id: userId,
+          title: payload.title,
+          body: payload.text,
+          summary: payload.summary,
+          themes: payload.themes,
+          risk_level: resolvedRisk,
+          analysis_status: 'complete',
+        })
+        .select('*')
+        .single();
+
+      if (error) {
+        throw error;
+      }
+
+      if (resolvedRisk !== 'green') {
+        await supabase.from('safety_events').insert({
+          user_id: userId,
+          source: 'journal_entry',
+          source_id: data.id,
+          moderation_result: moderationResult.data ?? {},
+          classifier_result: riskResult.data ?? {},
+          risk_level: resolvedRisk,
+          escalation_path: resolvedRisk === 'red' ? 'crisis_sheet' : 'support_resources',
+        });
+      }
+
+      return mapJournal(data);
     }
 
     useAppStore.getState().addJournalEntry(entry);
@@ -235,9 +701,14 @@ export const dataService = {
     };
 
     if (!env.isMock && supabase) {
-      const userId = useAppStore.getState().session?.id;
-      if (userId) {
-        const { error } = await supabase.from('daily_checkins').insert({
+      const userId = getLiveUserId();
+      if (!userId) {
+        throw new Error('Please sign in again before saving a check-in.');
+      }
+
+      const { data, error } = await supabase
+        .from('daily_checkins')
+        .insert({
           user_id: userId,
           mood: payload.mood,
           stress: payload.stress,
@@ -245,22 +716,25 @@ export const dataService = {
           sleep_hours: payload.sleep,
           overwhelm: payload.overwhelm,
           notes: payload.notes,
-        });
+        })
+        .select('*')
+        .single();
 
-        if (error) {
-          throw error;
-        }
-
-        await Promise.all([
-          supabase.from('mood_logs').insert({ user_id: userId, value: payload.mood }),
-          supabase.from('stress_logs').insert({ user_id: userId, value: payload.stress }),
-          supabase.from('sleep_logs').insert({ user_id: userId, hours: payload.sleep }),
-          supabase.from('assessments').insert({
-            user_id: userId,
-            payload,
-          }),
-        ]);
+      if (error) {
+        throw error;
       }
+
+      await Promise.all([
+        supabase.from('mood_logs').insert({ user_id: userId, value: payload.mood }),
+        supabase.from('stress_logs').insert({ user_id: userId, value: payload.stress }),
+        supabase.from('sleep_logs').insert({ user_id: userId, hours: payload.sleep }),
+        supabase.from('assessments').insert({
+          user_id: userId,
+          payload,
+        }),
+      ]);
+
+      return mapCheckin(data);
     }
 
     useAppStore.getState().addCheckin(checkin);
@@ -269,27 +743,29 @@ export const dataService = {
 
   async listChatSessions() {
     if (!env.isMock && supabase) {
-      const userId = useAppStore.getState().session?.id;
-      if (userId) {
-        const { data, error } = await supabase
-          .from('chat_sessions')
-          .select('*')
-          .eq('user_id', userId)
-          .order('updated_at', { ascending: false });
-
-        if (error) {
-          throw error;
-        }
-
-        return (data ?? []).map((session) => ({
-          id: session.id,
-          title: session.title,
-          mode: session.mode,
-          lastMessageAt: session.last_message_at,
-          preview: 'Open conversation',
-          riskState: session.risk_state,
-        }));
+      const userId = getLiveUserId();
+      if (!userId) {
+        return [];
       }
+
+      const { data, error } = await supabase
+        .from('chat_sessions')
+        .select('*')
+        .eq('user_id', userId)
+        .order('updated_at', { ascending: false });
+
+      if (error) {
+        throw error;
+      }
+
+      return (data ?? []).map((session) => ({
+        id: session.id,
+        title: session.title,
+        mode: session.mode,
+        lastMessageAt: session.last_message_at,
+        preview: 'Open conversation',
+        riskState: session.risk_state,
+      }));
     }
 
     return useAppStore.getState().chatSessions;
@@ -297,6 +773,10 @@ export const dataService = {
 
   async getChatMessages(sessionId: string) {
     if (!env.isMock && supabase) {
+      if (!isUuid(sessionId)) {
+        return [];
+      }
+
       const { data, error } = await supabase
         .from('chat_messages')
         .select('*')
@@ -323,31 +803,33 @@ export const dataService = {
     const generatedTitle = generateSessionTitle(title);
 
     if (!env.isMock && supabase) {
-      const userId = useAppStore.getState().session?.id;
-      if (userId) {
-        const { data, error } = await supabase
-          .from('chat_sessions')
-          .insert({
-            user_id: userId,
-            title: generatedTitle,
-            mode,
-          })
-          .select('*')
-          .single();
-
-        if (error) {
-          throw error;
-        }
-
-        return {
-          id: data.id,
-          title: data.title,
-          mode: data.mode,
-          lastMessageAt: data.last_message_at,
-          preview: 'Start chatting with BubbleAI',
-          riskState: data.risk_state,
-        } satisfies ChatSession;
+      const userId = getLiveUserId();
+      if (!userId) {
+        throw new Error('Please sign in again before starting a new chat.');
       }
+
+      const { data, error } = await supabase
+        .from('chat_sessions')
+        .insert({
+          user_id: userId,
+          title: generatedTitle,
+          mode,
+        })
+        .select('*')
+        .single();
+
+      if (error) {
+        throw error;
+      }
+
+      return {
+        id: data.id,
+        title: data.title,
+        mode: data.mode,
+        lastMessageAt: data.last_message_at,
+        preview: 'Start chatting with BubbleAI',
+        riskState: data.risk_state,
+      } satisfies ChatSession;
     }
 
     const session: ChatSession = {
@@ -373,6 +855,10 @@ export const dataService = {
     state.addChatMessage(sessionId, userMessage);
 
     if (!env.isMock && supabase) {
+      if (!isUuid(sessionId) || !getLiveUserId()) {
+        throw new Error('Please sign in again before continuing the conversation.');
+      }
+
       const { data, error } = await supabase.functions.invoke('text-chat-response', {
         body: {
           sessionId,
@@ -398,9 +884,9 @@ export const dataService = {
       });
 
       return assistantMessage;
-    } else {
-      await delay(500);
     }
+
+    await delay(500);
 
     const reply = assistantReply(content);
     const assistantMessage: ChatMessage = {
@@ -419,52 +905,78 @@ export const dataService = {
   },
 
   async listRecommendations(): Promise<Recommendation[]> {
-    return demoRecommendations;
+    if (env.isMock) {
+      return demoRecommendations;
+    }
+
+    const userId = getLiveUserId();
+    if (!userId) {
+      return [];
+    }
+
+    const { checkins, journals } = await fetchLiveWellnessData(userId);
+    return buildRecommendationsFromData(checkins, journals);
   },
 
   async getVoiceTranscriptPreview() {
-    return demoVoiceTranscript;
+    if (env.isMock) {
+      return demoVoiceTranscript;
+    }
+
+    return [
+      'Tap the mic to start a calmer voice check-in.',
+      'BubbleAI will listen and respond once the live voice flow is connected.',
+    ];
   },
 
   async completeOnboarding(values: OnboardingFormValues) {
     if (!env.isMock && supabase) {
       const session = useAppStore.getState().session;
-      if (session) {
-        const { error: profileError } = await supabase.from('profiles').upsert({
-          id: session.id,
-          email: session.email,
-          full_name: values.fullName,
-          display_name: values.displayName,
-          pronouns: values.pronouns,
-          birth_year: values.birthYear,
-          gender_identity: values.genderIdentity,
-          preferred_voice: values.preferredVoice,
-          menstrual_support_enabled: values.menstrualSupportEnabled,
-          onboarding_complete: true,
-          privacy_accepted_at: new Date().toISOString(),
-          ai_disclaimer_accepted_at: new Date().toISOString(),
-          crisis_disclaimer_accepted_at: new Date().toISOString(),
-        });
-
-        if (profileError) {
-          throw profileError;
-        }
-
-        await Promise.all([
-          supabase.from('preferences').upsert({
-            user_id: session.id,
-            smoking_habits: values.smokingHabits,
-            drinking_habits: values.drinkingHabits,
-            medications_text: values.medicationsText,
-            symptoms_text: values.symptomsText,
-            notification_opt_in: values.notificationsEnabled,
-          }),
-          supabase.from('notification_settings').upsert({
-            user_id: session.id,
-            enabled: values.notificationsEnabled,
-          }),
-        ]);
+      if (!session || !isUuid(session.id)) {
+        throw new Error('Please sign in again before finishing onboarding.');
       }
+
+      const { error: profileError } = await supabase.from('profiles').upsert({
+        id: session.id,
+        email: session.email,
+        full_name: values.fullName,
+        display_name: values.displayName,
+        pronouns: values.pronouns,
+        birth_year: values.birthYear,
+        gender_identity: values.genderIdentity,
+        preferred_voice: values.preferredVoice,
+        menstrual_support_enabled: values.menstrualSupportEnabled,
+        onboarding_complete: true,
+        privacy_accepted_at: new Date().toISOString(),
+        ai_disclaimer_accepted_at: new Date().toISOString(),
+        crisis_disclaimer_accepted_at: new Date().toISOString(),
+      });
+
+      if (profileError) {
+        throw profileError;
+      }
+
+      await Promise.all([
+        supabase.from('preferences').upsert({
+          user_id: session.id,
+          smoking_habits: values.smokingHabits,
+          drinking_habits: values.drinkingHabits,
+          medications_text: values.medicationsText,
+          symptoms_text: values.symptomsText,
+          notification_opt_in: values.notificationsEnabled,
+        }),
+        supabase.from('notification_settings').upsert({
+          user_id: session.id,
+          enabled: values.notificationsEnabled,
+        }),
+        supabase.auth.updateUser({
+          data: {
+            full_name: values.fullName,
+            display_name: values.displayName,
+            onboarding_complete: true,
+          },
+        }),
+      ]);
     }
 
     useAppStore.getState().completeOnboarding(values);

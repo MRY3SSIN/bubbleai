@@ -1,10 +1,10 @@
 import { PropsWithChildren } from 'react';
-import { StyleSheet, View, ViewStyle } from 'react-native';
+import { StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
 
 import { colors, radii, shadows, spacing } from '@/src/theme';
 
 type AppCardProps = PropsWithChildren<{
-  style?: ViewStyle;
+  style?: StyleProp<ViewStyle>;
   accent?: boolean;
 }>;
 
@@ -23,4 +23,3 @@ const styles = StyleSheet.create({
     backgroundColor: colors.cardStrong,
   },
 });
-

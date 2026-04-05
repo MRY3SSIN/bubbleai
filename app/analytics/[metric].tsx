@@ -1,5 +1,5 @@
 import { useLocalSearchParams } from 'expo-router';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 
 import { AppCard } from '@/src/components/AppCard';
 import { GaugeChart } from '@/src/components/charts/GaugeChart';
@@ -11,7 +11,9 @@ import { colors, radii, spacing, typography } from '@/src/theme';
 
 export default function AnalyticsDetailScreen() {
   const { metric = 'bubble_score' } = useLocalSearchParams<{ metric: string }>();
+  const { width } = useWindowDimensions();
   const { data } = useAnalyticsDetail(metric);
+  const isCompact = width < 390;
 
   if (!data) {
     return null;
@@ -31,7 +33,12 @@ export default function AnalyticsDetailScreen() {
           ]}
           value={data.period}
         />
-        <GaugeChart centerLabel={data.value.replace(/[^0-9.]/g, '') || data.value} max={data.gaugeMax} value={data.gaugeValue} />
+        <GaugeChart
+          centerLabel={data.value.replace(/[^0-9.]/g, '') || data.value}
+          max={data.gaugeMax}
+          size={isCompact ? 220 : 260}
+          value={data.gaugeValue}
+        />
         <Text style={styles.heroValue}>{data.value}</Text>
         <Text style={styles.heroSubtitle}>{data.subtitle}</Text>
       </AppCard>
@@ -39,7 +46,7 @@ export default function AnalyticsDetailScreen() {
       <AppCard>
         <Text style={styles.cardTitle}>{data.title}</Text>
         <Text style={styles.cardBody}>{data.insight}</Text>
-        <View style={styles.bars}>
+        <View style={[styles.bars, isCompact && styles.barsCompact]}>
           {data.trend.map((point) => (
             <View key={point.label} style={styles.barWrap}>
               <View
@@ -93,6 +100,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: spacing.sm,
   },
+  barsCompact: {
+    gap: spacing.xs,
+  },
   barWrap: {
     alignItems: 'center',
     flex: 1,
@@ -107,4 +117,3 @@ const styles = StyleSheet.create({
     ...typography.caption,
   },
 });
-

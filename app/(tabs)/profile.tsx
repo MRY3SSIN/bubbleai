@@ -29,9 +29,9 @@ export default function ProfileScreen() {
 
       <Text style={styles.sectionTitle}>Personal details</Text>
       <View style={styles.stack}>
-        <SettingsRow title="Health details" subtitle="Voice, symptoms, routines, and wellness support." onPress={() => router.push('/settings/index')} />
-        <SettingsRow title="Medical ID" subtitle="Clinician details and support notes." onPress={() => router.push('/settings/index')} />
-        <SettingsRow title="Emergency contact" subtitle={trustedContacts[0]?.name ?? 'Add someone you trust.'} onPress={() => router.push('/settings/index')} />
+        <SettingsRow title="Health details" subtitle="Voice, symptoms, routines, and wellness support." onPress={() => router.push('/settings')} />
+        <SettingsRow title="Medical ID" subtitle="Clinician details and support notes." onPress={() => router.push('/settings')} />
+        <SettingsRow title="Emergency contact" subtitle={trustedContacts[0]?.name ?? 'Add someone you trust.'} onPress={() => router.push('/settings')} />
       </View>
 
       <Text style={styles.sectionTitle}>Trusted support</Text>
@@ -45,7 +45,7 @@ export default function ProfileScreen() {
         ))}
       </View>
 
-      <PillButton label="Settings" onPress={() => router.push('/settings/index')} variant="secondary" />
+      <PillButton label="Settings" onPress={() => router.push('/settings')} variant="secondary" />
       <View style={{ height: spacing.md }} />
       <PillButton
         label="Sign Out"
@@ -93,4 +93,3 @@ const styles = StyleSheet.create({
     ...typography.caption,
   },
 });
-

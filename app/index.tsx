@@ -1,9 +1,11 @@
 import { useRouter } from 'expo-router';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
 import { Screen } from '@/src/components/layout/Screen';
 import { initializeMockState, useAppStore } from '@/src/lib/app-store';
+import { authService } from '@/src/lib/auth';
+import { env } from '@/src/lib/env';
 import { colors } from '@/src/theme';
 
 export default function IndexScreen() {
@@ -11,13 +13,36 @@ export default function IndexScreen() {
   const hydrated = useAppStore((state) => state.hydrated);
   const session = useAppStore((state) => state.session);
   const profile = useAppStore((state) => state.profile);
+  const [bootstrapped, setBootstrapped] = useState(false);
 
   useEffect(() => {
-    initializeMockState();
+    let active = true;
+
+    const bootstrap = async () => {
+      if (env.isMock) {
+        initializeMockState();
+      } else {
+        await authService.restoreSession();
+      }
+
+      if (active) {
+        setBootstrapped(true);
+      }
+    };
+
+    bootstrap().catch(() => {
+      if (active) {
+        setBootstrapped(true);
+      }
+    });
+
+    return () => {
+      active = false;
+    };
   }, []);
 
   useEffect(() => {
-    if (!hydrated) {
+    if (!hydrated || !bootstrapped) {
       return;
     }
 
@@ -32,7 +57,7 @@ export default function IndexScreen() {
     }
 
     router.replace('/(tabs)');
-  }, [hydrated, profile?.onboardingComplete, router, session, session?.onboardingComplete]);
+  }, [bootstrapped, hydrated, profile?.onboardingComplete, router, session, session?.onboardingComplete]);
 
   return (
     <Screen scroll={false}>
@@ -50,4 +75,3 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 });
-

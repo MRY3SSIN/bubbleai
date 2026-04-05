@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { env } from '@/src/lib/env';
 import { secureStoreStorage } from '@/src/lib/secure-store';
 import { useAppStore } from '@/src/lib/app-store';
-import type { SessionUser } from '@/src/types/domain';
+import type { Profile, SessionUser } from '@/src/types/domain';
 
 export const supabase = env.supabaseUrl && env.supabaseAnonKey
   ? createClient(env.supabaseUrl, env.supabaseAnonKey, {
@@ -30,6 +30,61 @@ const createMockUser = (credentials: Credentials): SessionUser => ({
   onboardingComplete: false,
 });
 
+const mapSessionUser = (
+  user: {
+    id: string;
+    email?: string | null;
+    user_metadata: Record<string, unknown>;
+  },
+  fallbackEmail?: string,
+  profile?: Profile | null,
+): SessionUser => ({
+  id: user.id,
+  email: user.email ?? fallbackEmail ?? '',
+  fullName:
+    profile?.fullName ??
+    (user.user_metadata.full_name as string | undefined) ??
+    'BubbleAI User',
+  displayName:
+    profile?.displayName ??
+    (user.user_metadata.display_name as string | undefined) ??
+    ((user.user_metadata.full_name as string | undefined)?.split(' ')[0] ?? 'Friend'),
+  onboardingComplete:
+    Boolean(profile?.onboardingComplete) || Boolean(user.user_metadata.onboarding_complete),
+});
+
+const fetchProfile = async (userId: string): Promise<Profile | null> => {
+  if (!supabase) {
+    return null;
+  }
+
+  const { data } = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle();
+
+  if (!data) {
+    return null;
+  }
+
+  return {
+    id: data.id,
+    email: data.email,
+    fullName: data.full_name,
+    displayName: data.display_name,
+    pronouns: data.pronouns ?? undefined,
+    birthYear: data.birth_year ?? undefined,
+    genderIdentity: data.gender_identity ?? undefined,
+    preferredVoice: data.preferred_voice,
+    medications: [],
+    diagnoses: [],
+    smokingHabits: undefined,
+    drinkingHabits: undefined,
+    menstrualSupportEnabled: Boolean(data.menstrual_support_enabled),
+    privacyAcceptedAt: data.privacy_accepted_at ?? undefined,
+    aiDisclaimerAcceptedAt: data.ai_disclaimer_accepted_at ?? undefined,
+    crisisDisclaimerAcceptedAt: data.crisis_disclaimer_accepted_at ?? undefined,
+    onboardingComplete: Boolean(data.onboarding_complete),
+  } satisfies Profile;
+};
+
 export const authService = {
   async login(credentials: Credentials) {
     if (env.isMock || !supabase) {
@@ -47,17 +102,10 @@ export const authService = {
       throw error;
     }
 
-    const sessionUser: SessionUser = {
-      id: data.user.id,
-      email: data.user.email ?? credentials.email,
-      fullName: (data.user.user_metadata.full_name as string | undefined) ?? 'BubbleAI User',
-      displayName:
-        (data.user.user_metadata.display_name as string | undefined) ??
-        ((data.user.user_metadata.full_name as string | undefined)?.split(' ')[0] ?? 'Friend'),
-      onboardingComplete: Boolean(data.user.user_metadata.onboarding_complete),
-    };
+    const profile = await fetchProfile(data.user.id);
+    const sessionUser = mapSessionUser(data.user, credentials.email, profile);
 
-    useAppStore.getState().setSession(sessionUser);
+    useAppStore.getState().hydrateLiveSession(sessionUser, profile);
     return sessionUser;
   },
 
@@ -142,6 +190,27 @@ export const authService = {
     return true;
   },
 
+  async restoreSession() {
+    if (env.isMock || !supabase) {
+      useAppStore.getState().setHydrated();
+      return null;
+    }
+
+    const { data, error } = await supabase.auth.getUser();
+
+    if (error || !data.user) {
+      useAppStore.getState().clearSession();
+      useAppStore.getState().setHydrated();
+      return null;
+    }
+
+    const profile = await fetchProfile(data.user.id);
+    const sessionUser = mapSessionUser(data.user, data.user.email ?? undefined, profile);
+    useAppStore.getState().hydrateLiveSession(sessionUser, profile);
+    useAppStore.getState().setHydrated();
+    return sessionUser;
+  },
+
   async logout() {
     if (!env.isMock && supabase) {
       await supabase.auth.signOut();
@@ -150,4 +219,3 @@ export const authService = {
     useAppStore.getState().clearSession();
   },
 };
-

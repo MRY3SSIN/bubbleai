@@ -1,6 +1,6 @@
 import { Feather } from '@expo/vector-icons';
 import { useState } from 'react';
-import { Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, TextInput, View, useWindowDimensions } from 'react-native';
 
 import { colors, radii, spacing, typography } from '@/src/theme';
 
@@ -16,13 +16,15 @@ export const BubbleComposer = ({
   onVoicePress,
 }: BubbleComposerProps) => {
   const [value, setValue] = useState('');
+  const { width } = useWindowDimensions();
+  const isCompact = width < 380;
 
   return (
-    <View style={styles.row}>
-      <Pressable style={styles.plus}>
+    <View style={[styles.row, isCompact && styles.rowCompact]}>
+      <Pressable style={[styles.plus, isCompact && styles.plusCompact]}>
         <Feather color={colors.inkMuted} name="plus" size={22} />
       </Pressable>
-      <View style={styles.inputWrap}>
+      <View style={[styles.inputWrap, isCompact && styles.inputWrapCompact]}>
         <TextInput
           onChangeText={setValue}
           onSubmitEditing={() => {
@@ -33,11 +35,11 @@ export const BubbleComposer = ({
           }}
           placeholder={placeholder}
           placeholderTextColor={colors.inkMuted}
-          style={styles.input}
+          style={[styles.input, isCompact && styles.inputCompact]}
           value={value}
         />
       </View>
-      <Pressable onPress={onVoicePress} style={styles.voice}>
+      <Pressable onPress={onVoicePress} style={[styles.voice, isCompact && styles.voiceCompact]}>
         <Feather color={colors.white} name="mic" size={18} />
       </Pressable>
     </View>
@@ -50,10 +52,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: spacing.sm,
   },
+  rowCompact: {
+    gap: spacing.xs,
+  },
   plus: {
     alignItems: 'center',
     justifyContent: 'center',
     width: 28,
+  },
+  plusCompact: {
+    width: 24,
   },
   inputWrap: {
     backgroundColor: colors.white,
@@ -62,10 +70,17 @@ const styles = StyleSheet.create({
     minHeight: 52,
     paddingHorizontal: spacing.lg,
   },
+  inputWrapCompact: {
+    minHeight: 48,
+    paddingHorizontal: spacing.md,
+  },
   input: {
     color: colors.ink,
     height: 52,
     ...typography.body,
+  },
+  inputCompact: {
+    height: 48,
   },
   voice: {
     alignItems: 'center',
@@ -75,5 +90,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: 52,
   },
+  voiceCompact: {
+    height: 48,
+    width: 48,
+  },
 });
-
