@@ -1,40 +1,39 @@
-import { Link, Stack } from 'expo-router';
-import { StyleSheet } from 'react-native';
+import { useRouter } from 'expo-router';
+import { StyleSheet, Text, View } from 'react-native';
 
-import { Text, View } from '@/components/Themed';
+import { PillButton } from '@/src/components/PillButton';
+import { Screen } from '@/src/components/layout/Screen';
+import { colors, spacing, typography } from '@/src/theme';
 
 export default function NotFoundScreen() {
-  return (
-    <>
-      <Stack.Screen options={{ title: 'Oops!' }} />
-      <View style={styles.container}>
-        <Text style={styles.title}>This screen doesn't exist.</Text>
+  const router = useRouter();
 
-        <Link href="/" style={styles.link}>
-          <Text style={styles.linkText}>Go to home screen!</Text>
-        </Link>
+  return (
+    <Screen scroll={false}>
+      <View style={styles.container}>
+        <Text style={styles.title}>This page drifted away</Text>
+        <Text style={styles.description}>Let’s bring you back to a calmer place in the app.</Text>
+        <PillButton label="Go home" onPress={() => router.replace('/')} />
       </View>
-    </>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    alignItems: 'center',
     justifyContent: 'center',
-    padding: 20,
+    gap: spacing.lg,
   },
   title: {
-    fontSize: 20,
-    fontWeight: 'bold',
+    color: colors.ink,
+    textAlign: 'center',
+    ...typography.h1,
   },
-  link: {
-    marginTop: 15,
-    paddingVertical: 15,
-  },
-  linkText: {
-    fontSize: 14,
-    color: '#2e78b7',
+  description: {
+    color: colors.inkMuted,
+    textAlign: 'center',
+    ...typography.body,
   },
 });
+

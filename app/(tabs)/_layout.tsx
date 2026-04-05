@@ -1,59 +1,42 @@
-import React from 'react';
-import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { Link, Tabs } from 'expo-router';
-import { Pressable } from 'react-native';
+import { Feather } from '@expo/vector-icons';
+import { Tabs } from 'expo-router';
 
-import Colors from '@/constants/Colors';
-import { useColorScheme } from '@/components/useColorScheme';
-import { useClientOnlyValue } from '@/components/useClientOnlyValue';
+import { colors, radii } from '@/src/theme';
 
-// You can explore the built-in icon families and icons on the web at https://icons.expo.fyi/
-function TabBarIcon(props: {
-  name: React.ComponentProps<typeof FontAwesome>['name'];
-  color: string;
-}) {
-  return <FontAwesome size={28} style={{ marginBottom: -3 }} {...props} />;
-}
-
-export default function TabLayout() {
-  const colorScheme = useColorScheme();
-
+export default function TabsLayout() {
   return (
     <Tabs
-      screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
-        // Disable the static render of the header on web
-        // to prevent a hydration error in React Navigation v6.
-        headerShown: useClientOnlyValue(false, true),
-      }}>
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: 'Tab One',
-          tabBarIcon: ({ color }) => <TabBarIcon name="code" color={color} />,
-          headerRight: () => (
-            <Link href="/modal" asChild>
-              <Pressable>
-                {({ pressed }) => (
-                  <FontAwesome
-                    name="info-circle"
-                    size={25}
-                    color={Colors[colorScheme ?? 'light'].text}
-                    style={{ marginRight: 15, opacity: pressed ? 0.5 : 1 }}
-                  />
-                )}
-              </Pressable>
-            </Link>
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="two"
-        options={{
-          title: 'Tab Two',
-          tabBarIcon: ({ color }) => <TabBarIcon name="code" color={color} />,
-        }}
-      />
+      screenOptions={({ route }) => ({
+        headerShown: false,
+        tabBarActiveTintColor: colors.mint,
+        tabBarInactiveTintColor: '#A8B7B2',
+        tabBarStyle: {
+          backgroundColor: colors.white,
+          borderTopWidth: 0,
+          borderTopLeftRadius: radii.lg,
+          borderTopRightRadius: radii.lg,
+          height: 84,
+          paddingTop: 10,
+        },
+        tabBarIcon: ({ color, size }) => {
+          const iconMap: Record<string, keyof typeof Feather.glyphMap> = {
+            index: 'home',
+            checkins: 'plus-square',
+            insights: 'bar-chart-2',
+            notifications: 'bell',
+            profile: 'user',
+          };
+
+          return <Feather color={color} name={iconMap[route.name] ?? 'circle'} size={size} />;
+        },
+      })}
+    >
+      <Tabs.Screen name="index" options={{ title: 'Home' }} />
+      <Tabs.Screen name="checkins" options={{ title: 'Assess' }} />
+      <Tabs.Screen name="insights" options={{ title: 'Insights' }} />
+      <Tabs.Screen name="notifications" options={{ title: 'Alerts' }} />
+      <Tabs.Screen name="profile" options={{ title: 'Profile' }} />
     </Tabs>
   );
 }
+
