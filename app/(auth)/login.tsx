@@ -14,7 +14,7 @@ import { colors, spacing, typography } from '@/src/theme';
 
 const schema = z.object({
   email: z.string().email(),
-  password: z.string().min(6),
+  password: z.string().min(8),
 });
 
 type LoginValues = z.infer<typeof schema>;
@@ -25,9 +25,10 @@ export default function LoginScreen() {
   const { control, handleSubmit, formState } = useForm<LoginValues>({
     resolver: zodResolver(schema),
     defaultValues: {
-      email: 'simar@bubbleai.app',
-      password: 'BubbleAI123',
+      email: '',
+      password: '',
     },
+    mode: 'onChange',
   });
 
   const onSubmit = handleSubmit(async (values) => {
@@ -137,4 +138,3 @@ const styles = StyleSheet.create({
     ...typography.caption,
   },
 });
-

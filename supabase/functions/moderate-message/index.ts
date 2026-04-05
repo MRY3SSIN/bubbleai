@@ -1,6 +1,7 @@
 import { corsHeaders } from '../_shared/cors.ts';
 import { assertServerEnv } from '../_shared/env.ts';
 import { createModeration } from '../_shared/openai.ts';
+import { getUserFromRequest } from '../_shared/supabase.ts';
 
 Deno.serve(async (request) => {
   if (request.method === 'OPTIONS') {
@@ -9,6 +10,7 @@ Deno.serve(async (request) => {
 
   try {
     assertServerEnv();
+    await getUserFromRequest(request);
     const { input } = await request.json();
     const moderation = await createModeration(input);
     return Response.json(moderation, { headers: corsHeaders });
@@ -19,4 +21,3 @@ Deno.serve(async (request) => {
     );
   }
 });
-

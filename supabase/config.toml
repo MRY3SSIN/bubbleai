@@ -83,11 +83,11 @@ minimum_password_length = 8
 password_requirements = ""
 
 [auth.rate_limit]
-email_sent = 6
+email_sent = 20
 sms_sent = 30
 anonymous_users = 30
 token_refresh = 150
-sign_in_sign_ups = 30
+sign_in_sign_ups = 60
 token_verifications = 30
 web3 = 30
 

@@ -31,11 +31,12 @@ export default function SignupScreen() {
   const { control, handleSubmit, formState } = useForm<SignupValues>({
     resolver: zodResolver(schema),
     defaultValues: {
-      fullName: 'Simar Bhatia',
-      email: 'simar@bubbleai.app',
-      password: 'BubbleAI123',
-      confirmPassword: 'BubbleAI123',
+      fullName: '',
+      email: '',
+      password: '',
+      confirmPassword: '',
     },
+    mode: 'onChange',
   });
 
   const onSubmit = handleSubmit(async (values) => {
@@ -119,4 +120,3 @@ const styles = StyleSheet.create({
     ...typography.caption,
   },
 });
-

@@ -22,7 +22,8 @@ export default function ForgotPasswordScreen() {
   const mutation = useForgotPassword();
   const { control, handleSubmit, formState } = useForm<Values>({
     resolver: zodResolver(schema),
-    defaultValues: { email: 'simar@bubbleai.app' },
+    defaultValues: { email: '' },
+    mode: 'onChange',
   });
 
   const onSubmit = handleSubmit(async ({ email }) => {
@@ -79,4 +80,3 @@ const styles = StyleSheet.create({
     ...typography.body,
   },
 });
-

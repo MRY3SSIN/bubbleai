@@ -29,14 +29,23 @@ export const Screen = ({
   const horizontalPadding = width < 360 ? spacing.lg : spacing.xl;
 
   const content = (
-    <View style={[styles.content, padded && { paddingHorizontal: horizontalPadding, paddingBottom: spacing.xxxl }]}>
+    <View
+      style={[
+        styles.content,
+        padded && {
+          paddingHorizontal: horizontalPadding,
+          paddingTop: spacing.lg,
+          paddingBottom: spacing.xxxl,
+        },
+      ]}
+    >
       {header}
       {children}
     </View>
   );
 
   return (
-    <SafeAreaView edges={['top', 'left', 'right']} style={[styles.safeArea, { backgroundColor }]}>
+    <SafeAreaView edges={['top', 'left', 'right', 'bottom']} style={[styles.safeArea, { backgroundColor }]}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.flex}

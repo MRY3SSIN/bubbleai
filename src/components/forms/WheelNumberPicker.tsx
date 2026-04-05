@@ -36,7 +36,7 @@ const styles = StyleSheet.create({
   label: {
     color: colors.ink,
     textAlign: 'center',
-    ...typography.h1,
+    ...typography.h2,
   },
   wheel: {
     alignItems: 'center',
@@ -56,7 +56,10 @@ const styles = StyleSheet.create({
   valueText: {
     color: colors.mint,
     ...typography.display,
-    fontSize: 72,
+    fontSize: 62,
+    includeFontPadding: false,
+    lineHeight: 66,
+    textAlignVertical: 'center',
   },
   stepper: {
     alignItems: 'center',
@@ -67,4 +70,3 @@ const styles = StyleSheet.create({
     width: 56,
   },
 });
-

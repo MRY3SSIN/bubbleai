@@ -203,14 +203,15 @@ const styles = StyleSheet.create({
   },
   quickTitle: {
     color: colors.ink,
-    marginTop: spacing.xl,
+    marginTop: spacing.lg,
     ...typography.h2,
-    fontSize: 28,
-  },
-  quickTitleCompact: {
     fontSize: 24,
     lineHeight: 28,
-    marginTop: spacing.lg,
+  },
+  quickTitleCompact: {
+    fontSize: 20,
+    lineHeight: 24,
+    marginTop: spacing.md,
   },
   quickSubtitle: {
     color: colors.inkMuted,

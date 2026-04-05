@@ -1,4 +1,5 @@
 import { useLocalSearchParams } from 'expo-router';
+import { useState } from 'react';
 import { StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 
 import { AppCard } from '@/src/components/AppCard';
@@ -12,7 +13,8 @@ import { colors, radii, spacing, typography } from '@/src/theme';
 export default function AnalyticsDetailScreen() {
   const { metric = 'bubble_score' } = useLocalSearchParams<{ metric: string }>();
   const { width } = useWindowDimensions();
-  const { data } = useAnalyticsDetail(metric);
+  const [period, setPeriod] = useState<'week' | 'month' | '6_month' | 'year'>('week');
+  const { data } = useAnalyticsDetail(metric, period);
   const isCompact = width < 390;
 
   if (!data) {
@@ -24,14 +26,14 @@ export default function AnalyticsDetailScreen() {
       <BackHeader title={data.title} />
       <AppCard accent style={styles.hero}>
         <SegmentedControl
-          onChange={() => undefined}
+          onChange={setPeriod}
           segments={[
             { label: 'W', value: 'week' },
             { label: 'M', value: 'month' },
             { label: '6M', value: '6_month' },
             { label: 'Y', value: 'year' },
           ]}
-          value={data.period}
+          value={period}
         />
         <GaugeChart
           centerLabel={data.value.replace(/[^0-9.]/g, '') || data.value}

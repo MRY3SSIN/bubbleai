@@ -22,6 +22,26 @@ type Credentials = {
   fullName?: string;
 };
 
+const mapAuthError = (error: { message: string }) => {
+  const message = error.message.toLowerCase();
+
+  if (message.includes('email rate limit exceeded')) {
+    return new Error(
+      'Too many email codes were requested for this address. Please wait a little and try again.',
+    );
+  }
+
+  if (message.includes('user already registered')) {
+    return new Error('This email already has an account. Try logging in instead.');
+  }
+
+  if (message.includes('invalid login credentials')) {
+    return new Error('That email or password does not look right yet.');
+  }
+
+  return error;
+};
+
 const createMockUser = (credentials: Credentials): SessionUser => ({
   id: `mock-${credentials.email}`,
   email: credentials.email,
@@ -99,7 +119,7 @@ export const authService = {
     });
 
     if (error) {
-      throw error;
+      throw mapAuthError(error);
     }
 
     const profile = await fetchProfile(data.user.id);
@@ -128,7 +148,7 @@ export const authService = {
     });
 
     if (error) {
-      throw error;
+      throw mapAuthError(error);
     }
 
     useAppStore.getState().setPendingVerification(credentials.email);
@@ -149,13 +169,13 @@ export const authService = {
     });
 
     if (error) {
-      throw error;
+      throw mapAuthError(error);
     }
 
     useAppStore.getState().setPendingVerification(email);
   },
 
-  async verifyCode(email: string, code: string) {
+  async verifyCode(email: string, code: string, context: 'signup' | 'forgot' = 'signup') {
     if (env.isMock || !supabase) {
       if (code.length !== 6) {
         throw new Error('Enter a 6 digit code.');
@@ -166,7 +186,7 @@ export const authService = {
     const { error } = await supabase.auth.verifyOtp({
       email,
       token: code,
-      type: 'email',
+      type: context === 'signup' ? 'signup' : 'email',
     });
 
     if (error) {

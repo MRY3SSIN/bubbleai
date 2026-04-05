@@ -7,7 +7,16 @@ export const useSignup = () => useMutation({ mutationFn: authService.signup });
 export const useForgotPassword = () =>
   useMutation({ mutationFn: (email: string) => authService.sendForgotPasswordCode(email) });
 export const useVerifyCode = () =>
-  useMutation({ mutationFn: ({ email, code }: { email: string; code: string }) => authService.verifyCode(email, code) });
+  useMutation({
+    mutationFn: ({
+      email,
+      code,
+      context,
+    }: {
+      email: string;
+      code: string;
+      context: 'signup' | 'forgot';
+    }) => authService.verifyCode(email, code, context),
+  });
 export const useResetPassword = () =>
   useMutation({ mutationFn: ({ password }: { password: string }) => authService.resetPassword(password) });
-

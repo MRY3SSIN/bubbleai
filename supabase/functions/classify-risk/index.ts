@@ -3,6 +3,7 @@ import { assertServerEnv, serverEnv } from '../_shared/env.ts';
 import { createResponse } from '../_shared/openai.ts';
 import { bubbleSafetyDeveloperPrompt } from '../_shared/prompts.ts';
 import { detectRiskLevel, fallbackSafetyResponse } from '../_shared/safety.ts';
+import { getUserFromRequest } from '../_shared/supabase.ts';
 
 Deno.serve(async (request) => {
   if (request.method === 'OPTIONS') {
@@ -11,6 +12,7 @@ Deno.serve(async (request) => {
 
   try {
     assertServerEnv();
+    await getUserFromRequest(request);
     const { content } = await request.json();
     const heuristicRisk = detectRiskLevel(content);
 
@@ -62,4 +64,3 @@ Deno.serve(async (request) => {
     );
   }
 });
-

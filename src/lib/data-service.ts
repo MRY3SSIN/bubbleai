@@ -43,6 +43,46 @@ const getLiveUserId = () => {
   return isUuid(userId) ? userId : null;
 };
 
+const getAccessToken = async () => {
+  if (!supabase) {
+    return null;
+  }
+
+  const { data } = await supabase.auth.getSession();
+  return data.session?.access_token ?? null;
+};
+
+const invokeEdgeFunction = async <TResponse>(
+  name: string,
+  payload: Record<string, unknown>,
+): Promise<TResponse> => {
+  const accessToken = await getAccessToken();
+
+  if (!accessToken) {
+    throw new Error('Please sign in again before using this feature.');
+  }
+
+  const response = await fetch(`${env.supabaseUrl}/functions/v1/${name}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+      apikey: env.supabaseAnonKey,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const data = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    throw new Error(
+      typeof data?.error === 'string' ? data.error : 'The server could not finish this request.',
+    );
+  }
+
+  return data as TResponse;
+};
+
 const quickActions = [
   { id: 'qa-analysis', title: 'Take Self Analysis', subtitle: '2 mins', route: '/checkin/new' },
   { id: 'qa-journal', title: 'Take Journal', subtitle: 'Reflect gently', route: '/journal/new-entry' },
@@ -255,6 +295,7 @@ const buildAnalyticsFromData = (
   metric: string,
   checkins: DailyCheckin[],
   journals: JournalEntry[],
+  period: 'week' | 'month' | '6_month' | 'year' = 'week',
 ): AnalyticsDetail => {
   const bubbleScore = calculateBubbleScore(checkins, journals);
   const stressTrend = buildWeeklyTrend(checkins, (item) => item.stress);
@@ -271,8 +312,8 @@ const buildAnalyticsFromData = (
         metric: 'sleep',
         title: 'Sleep',
         value: averageSleep ? `${averageSleep.toFixed(1)} hrs/day` : '0 hrs/day',
-        subtitle: 'Average sleep in the last 14 days',
-        period: 'week',
+        subtitle: `Average sleep for ${period === 'week' ? 'this week' : period === 'month' ? 'this month' : period === '6_month' ? 'the last 6 months' : 'this year'}`,
+        period,
         gaugeValue: averageSleep,
         gaugeMax: 10,
         trend: sleepTrend,
@@ -285,8 +326,8 @@ const buildAnalyticsFromData = (
         metric: 'stress',
         title: 'Stress Level',
         value: latest ? `${latest.stress}` : '0',
-        subtitle: 'Most recent stress check-in',
-        period: 'week',
+        subtitle: `Most recent stress check-in for ${period === 'week' ? 'this week' : period === 'month' ? 'this month' : period === '6_month' ? 'the last 6 months' : 'this year'}`,
+        period,
         gaugeValue: latest?.stress ?? 0,
         gaugeMax: 10,
         trend: stressTrend,
@@ -299,8 +340,8 @@ const buildAnalyticsFromData = (
         metric: 'mood',
         title: 'Mood Progress',
         value: moodLabel(Math.round(latest?.mood ?? averageMood) || 0),
-        subtitle: 'Most recent mood check-in',
-        period: 'week',
+        subtitle: `Most recent mood pattern for ${period === 'week' ? 'this week' : period === 'month' ? 'this month' : period === '6_month' ? 'the last 6 months' : 'this year'}`,
+        period,
         gaugeValue: latest?.mood ?? averageMood,
         gaugeMax: 5,
         trend: moodTrend,
@@ -314,7 +355,7 @@ const buildAnalyticsFromData = (
         title: 'Bubble Score',
         value: `${bubbleScore.total}`,
         subtitle: 'Overall progress',
-        period: 'week',
+        period,
         gaugeValue: bubbleScore.total,
         gaugeMax: 300,
         trend: buildTrend(
@@ -449,6 +490,58 @@ const fetchLiveWellnessData = async (userId: string) => {
   };
 };
 
+const limitForPeriod = (period: 'week' | 'month' | '6_month' | 'year') => {
+  switch (period) {
+    case 'month':
+      return 30;
+    case '6_month':
+      return 180;
+    case 'year':
+      return 365;
+    default:
+      return 14;
+  }
+};
+
+const fetchLiveWellnessDataForPeriod = async (
+  userId: string,
+  period: 'week' | 'month' | '6_month' | 'year',
+) => {
+  if (!supabase) {
+    return { checkins: [], journals: [] };
+  }
+
+  const limit = limitForPeriod(period);
+  const [{ data: checkinRows, error: checkinError }, { data: journalRows, error: journalError }] =
+    await Promise.all([
+      supabase
+        .from('daily_checkins')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(limit),
+      supabase
+        .from('journal_entries')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(limit),
+    ]);
+
+  if (checkinError) {
+    throw checkinError;
+  }
+
+  if (journalError) {
+    throw journalError;
+  }
+
+  return {
+    checkins: (checkinRows ?? []).map(mapCheckin),
+    journals: (journalRows ?? []).map(mapJournal),
+  };
+};
+
 export const dataService = {
   auth: authService,
 
@@ -482,19 +575,22 @@ export const dataService = {
     return buildInsightsFromData(checkins, journals);
   },
 
-  async getAnalytics(metric: string): Promise<AnalyticsDetail> {
+  async getAnalytics(
+    metric: string,
+    period: 'week' | 'month' | '6_month' | 'year' = 'week',
+  ): Promise<AnalyticsDetail> {
     if (env.isMock) {
       const state = useAppStore.getState();
-      return buildAnalyticsFromData(metric, state.checkins, state.journalEntries);
+      return buildAnalyticsFromData(metric, state.checkins, state.journalEntries, period);
     }
 
     const userId = getLiveUserId();
     if (!userId) {
-      return buildAnalyticsFromData(metric, [], []);
+      return buildAnalyticsFromData(metric, [], [], period);
     }
 
-    const { checkins, journals } = await fetchLiveWellnessData(userId);
-    return buildAnalyticsFromData(metric, checkins, journals);
+    const { checkins, journals } = await fetchLiveWellnessDataForPeriod(userId, period);
+    return buildAnalyticsFromData(metric, checkins, journals, period);
   },
 
   async listNotifications(): Promise<NotificationItem[]> {
@@ -642,19 +738,22 @@ export const dataService = {
         throw new Error('Please sign in again before creating a journal entry.');
       }
 
-      const [moderationResult, riskResult] = await Promise.all([
-        supabase.functions.invoke('moderate-message', {
-          body: { input: payload.text },
+      const [moderationResult, riskResult] = await Promise.allSettled([
+        invokeEdgeFunction<Record<string, unknown>>('moderate-message', {
+          input: payload.text,
         }),
-        supabase.functions.invoke('classify-risk', {
-          body: { content: payload.text },
-        }),
+        invokeEdgeFunction<{ risk_level?: JournalEntry['riskLevel']; confidence?: number; rationale?: string }>(
+          'classify-risk',
+          { content: payload.text },
+        ),
       ]);
 
+      const moderationData =
+        moderationResult.status === 'fulfilled' ? moderationResult.value : null;
+      const riskData = riskResult.status === 'fulfilled' ? riskResult.value : null;
+
       const resolvedRisk =
-        riskResult.error || !riskResult.data?.risk_level
-          ? detectRiskLevel(payload.text)
-          : riskResult.data.risk_level;
+        !riskData?.risk_level ? detectRiskLevel(payload.text) : riskData.risk_level;
 
       const { data, error } = await supabase
         .from('journal_entries')
@@ -679,8 +778,8 @@ export const dataService = {
           user_id: userId,
           source: 'journal_entry',
           source_id: data.id,
-          moderation_result: moderationResult.data ?? {},
-          classifier_result: riskResult.data ?? {},
+          moderation_result: moderationData ?? {},
+          classifier_result: riskData ?? {},
           risk_level: resolvedRisk,
           escalation_path: resolvedRisk === 'red' ? 'crisis_sheet' : 'support_resources',
         });
@@ -859,16 +958,17 @@ export const dataService = {
         throw new Error('Please sign in again before continuing the conversation.');
       }
 
-      const { data, error } = await supabase.functions.invoke('text-chat-response', {
-        body: {
+      const data = await invokeEdgeFunction<{ assistant_text: string; risk_level: ChatMessage['riskLevel'] }>(
+        'text-chat-response',
+        {
           sessionId,
           message: content,
           mode: 'text',
         },
-      });
+      );
 
-      if (error) {
-        throw error;
+      if (!data?.assistant_text) {
+        throw new Error('BubbleAI could not answer right now. Please try again.');
       }
 
       const assistantMessage: ChatMessage = {

@@ -8,9 +8,11 @@ export const useInsights = () =>
     queryFn: () => dataService.listInsights(),
   });
 
-export const useAnalyticsDetail = (metric: string) =>
+export const useAnalyticsDetail = (
+  metric: string,
+  period: 'week' | 'month' | '6_month' | 'year',
+) =>
   useQuery({
-    queryKey: ['analytics', metric],
-    queryFn: () => dataService.getAnalytics(metric),
+    queryKey: ['analytics', metric, period],
+    queryFn: () => dataService.getAnalytics(metric, period),
   });
-

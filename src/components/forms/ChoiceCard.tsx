@@ -34,7 +34,7 @@ export const ChoiceCard = ({
 
 const styles = StyleSheet.create({
   card: {
-    alignItems: 'center',
+    alignItems: 'flex-start',
     backgroundColor: colors.white,
     borderColor: colors.border,
     borderRadius: radii.lg,
@@ -49,7 +49,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.cardStrong,
   },
   leading: {
-    alignItems: 'center',
+    alignItems: 'flex-start',
     flexDirection: 'row',
     flex: 1,
     gap: spacing.md,
@@ -73,6 +73,7 @@ const styles = StyleSheet.create({
     color: colors.ink,
     ...typography.h3,
     fontSize: 18,
+    lineHeight: 24,
   },
   description: {
     color: colors.inkMuted,
@@ -83,10 +84,11 @@ const styles = StyleSheet.create({
     borderRadius: radii.pill,
     borderWidth: 2,
     height: 20,
+    marginLeft: spacing.md,
+    marginTop: spacing.xs,
     width: 20,
   },
   radioSelected: {
     borderColor: colors.mint,
   },
 });
-

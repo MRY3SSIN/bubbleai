@@ -10,16 +10,16 @@ import { colors, radii, spacing, typography } from '@/src/theme';
 
 export default function VerifyCodeScreen() {
   const router = useRouter();
-  const { email = 'simar@bubbleai.app', context = 'signup' } = useLocalSearchParams<{
+  const { email = '', context = 'signup' } = useLocalSearchParams<{
     email: string;
     context: 'signup' | 'forgot';
   }>();
   const mutation = useVerifyCode();
-  const [digits, setDigits] = useState(['1', '2', '3', '4', '', '']);
+  const [digits, setDigits] = useState(['', '', '', '', '', '']);
 
   const submit = async () => {
     try {
-      await mutation.mutateAsync({ email, code: digits.join('') });
+      await mutation.mutateAsync({ email, code: digits.join(''), context });
       if (context === 'forgot') {
         router.replace('/(auth)/reset-password');
       } else {
@@ -102,4 +102,3 @@ const styles = StyleSheet.create({
     color: colors.mint,
   },
 });
-

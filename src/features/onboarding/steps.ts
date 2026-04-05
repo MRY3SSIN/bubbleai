@@ -44,3 +44,18 @@ export const onboardingDefaults = {
   crisisDisclaimerAccepted: false,
 };
 
+export const smokingHabitOptions = [
+  { label: 'None', value: 'None' },
+  { label: 'Occasionally', value: 'Occasionally' },
+  { label: 'Most days', value: 'Most days' },
+  { label: 'Daily', value: 'Daily' },
+  { label: 'Trying to quit', value: 'Trying to quit' },
+];
+
+export const drinkingHabitOptions = [
+  { label: 'Never', value: 'Never' },
+  { label: 'Rarely', value: 'Rarely' },
+  { label: 'Socially', value: 'Socially' },
+  { label: 'Most weeks', value: 'Most weeks' },
+  { label: 'Prefer not to say', value: 'Prefer not to say' },
+];

@@ -4,7 +4,6 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { ChoiceCard } from '@/src/components/forms/ChoiceCard';
 import { FeelingSlider } from '@/src/components/forms/FeelingSlider';
-import { FormField } from '@/src/components/forms/FormField';
 import { WheelNumberPicker } from '@/src/components/forms/WheelNumberPicker';
 import { BackHeader } from '@/src/components/layout/BackHeader';
 import { Screen } from '@/src/components/layout/Screen';
@@ -18,11 +17,6 @@ export default function OnboardingWellnessScreen() {
   const draft = useAppStore((state) => state.onboardingDraft);
   const setDraft = useAppStore((state) => state.setOnboardingDraft);
 
-  const [medicationsEnabled, setMedicationsEnabled] = useState(draft.medicationsEnabled ?? onboardingDefaults.medicationsEnabled);
-  const [medicationsText, setMedicationsText] = useState(draft.medicationsText ?? onboardingDefaults.medicationsText);
-  const [symptomsText, setSymptomsText] = useState(draft.symptomsText ?? onboardingDefaults.symptomsText);
-  const [smokingHabits, setSmokingHabits] = useState(draft.smokingHabits ?? onboardingDefaults.smokingHabits);
-  const [drinkingHabits, setDrinkingHabits] = useState(draft.drinkingHabits ?? onboardingDefaults.drinkingHabits);
   const [feelingToday, setFeelingToday] = useState<1 | 2 | 3 | 4 | 5>(
     (draft.feelingToday ?? onboardingDefaults.feelingToday) as 1 | 2 | 3 | 4 | 5,
   );
@@ -35,11 +29,6 @@ export default function OnboardingWellnessScreen() {
 
   const goNext = () => {
     setDraft({
-      medicationsEnabled,
-      medicationsText,
-      symptomsText,
-      smokingHabits,
-      drinkingHabits,
       feelingToday,
       stressLevel,
       sleepHours,
@@ -53,34 +42,10 @@ export default function OnboardingWellnessScreen() {
     <Screen>
       <BackHeader />
       <Text style={styles.title}>Wellness preferences</Text>
+      <Text style={styles.subtitle}>
+        This helps BubbleAI understand how you feel today and what kind of support you want.
+      </Text>
       <View style={styles.stack}>
-        <Text style={styles.sectionTitle}>Are you taking any medications?</Text>
-        <ChoiceCard
-          title="Yes, one or multiple"
-          selected={medicationsEnabled}
-          onPress={() => setMedicationsEnabled(true)}
-        />
-        <ChoiceCard
-          title="I’m not taking any"
-          selected={!medicationsEnabled}
-          onPress={() => setMedicationsEnabled(false)}
-        />
-        {medicationsEnabled ? (
-          <FormField
-            hint="Comma separated, optional"
-            label="Please specify your medications"
-            value={medicationsText}
-            onChangeText={setMedicationsText}
-          />
-        ) : null}
-        <FormField
-          hint="Optional"
-          label="Other symptoms or diagnoses"
-          value={symptomsText}
-          onChangeText={setSymptomsText}
-        />
-        <FormField label="Smoking habits" value={smokingHabits} onChangeText={setSmokingHabits} />
-        <FormField label="Drinking habits" value={drinkingHabits} onChangeText={setDrinkingHabits} />
         <Text style={styles.sectionTitle}>How are you feeling today?</Text>
         <FeelingSlider value={feelingToday} onChange={setFeelingToday} />
         <WheelNumberPicker label="Stress level (1 to 10)" min={1} max={10} onChange={setStressLevel} value={stressLevel} />
@@ -106,8 +71,13 @@ export default function OnboardingWellnessScreen() {
 const styles = StyleSheet.create({
   title: {
     color: colors.ink,
-    marginBottom: spacing.xl,
+    marginBottom: spacing.md,
     ...typography.h1,
+  },
+  subtitle: {
+    color: colors.inkMuted,
+    marginBottom: spacing.xl,
+    ...typography.body,
   },
   stack: {
     gap: spacing.lg,

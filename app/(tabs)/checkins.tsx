@@ -1,4 +1,5 @@
 import { useRouter } from 'expo-router';
+import { format } from 'date-fns';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 
@@ -20,7 +21,7 @@ export default function CheckinsHubScreen() {
 
   return (
     <Screen>
-      <SectionHeader eyebrow="Sunday, 29 December" title="Self Assessment" />
+      <SectionHeader eyebrow={format(new Date(), 'EEEE, d MMMM')} title="Self Assessment" />
       <View style={[styles.quickGrid, isCompact && styles.quickGridCompact]}>
         <Pressable onPress={() => router.push('/checkin/new')} style={styles.gridItem}>
           <AppCard style={[styles.quickCard, isCompact && styles.quickCardCompact]}>
@@ -92,13 +93,15 @@ const styles = StyleSheet.create({
   },
   quickTitle: {
     color: colors.ink,
-    marginTop: spacing.xl,
+    marginTop: spacing.lg,
     ...typography.h2,
-  },
-  quickTitleCompact: {
     fontSize: 24,
     lineHeight: 28,
-    marginTop: spacing.lg,
+  },
+  quickTitleCompact: {
+    fontSize: 20,
+    lineHeight: 24,
+    marginTop: spacing.md,
   },
   stack: {
     gap: spacing.md,

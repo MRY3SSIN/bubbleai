@@ -29,9 +29,10 @@ export default function ResetPasswordScreen() {
   const { control, handleSubmit, formState } = useForm<Values>({
     resolver: zodResolver(schema),
     defaultValues: {
-      password: 'BubbleAI123',
-      confirmPassword: 'BubbleAI123',
+      password: '',
+      confirmPassword: '',
     },
+    mode: 'onChange',
   });
 
   const onSubmit = handleSubmit(async ({ password }) => {
@@ -84,4 +85,3 @@ const styles = StyleSheet.create({
     ...typography.body,
   },
 });
-
