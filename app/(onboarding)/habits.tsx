@@ -41,7 +41,11 @@ export default function OnboardingHabitsScreen() {
           value={drinkingHabits}
         />
       </View>
-      <PillButton label="Continue" onPress={() => router.push('/(onboarding)/wellness')} />
+      <PillButton
+        label="Continue"
+        onPress={() => router.push('/(onboarding)/wellness')}
+        style={styles.cta}
+      />
     </Screen>
   );
 }
@@ -59,5 +63,8 @@ const styles = StyleSheet.create({
   },
   stack: {
     gap: spacing.lg,
+  },
+  cta: {
+    marginTop: spacing.xxxl,
   },
 });

@@ -17,6 +17,7 @@ export default function CheckinsHubScreen() {
   const [segment, setSegment] = useState<'analysis' | 'journals'>('analysis');
   const { data: journalEntries } = useJournalEntries();
   const checkins = useAppStore((state) => state.checkins);
+  const privateMode = useAppStore((state) => state.privacySettings.privateMode);
   const isCompact = width < 390;
 
   return (
@@ -60,8 +61,14 @@ export default function CheckinsHubScreen() {
           : journalEntries?.map((entry) => (
               <Pressable key={entry.id} onPress={() => router.push(`/journal/${entry.id}` as never)}>
                 <AppCard>
-                  <Text style={styles.listTitle}>{entry.title}</Text>
-                  <Text style={styles.listBody}>{entry.summary}</Text>
+                  <Text style={styles.listTitle}>
+                    {privateMode ? 'Private journal entry' : entry.title}
+                  </Text>
+                  <Text style={styles.listBody}>
+                    {privateMode
+                      ? 'Preview hidden while private mode is on.'
+                      : entry.summary}
+                  </Text>
                 </AppCard>
               </Pressable>
             ))}

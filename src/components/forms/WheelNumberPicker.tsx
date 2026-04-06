@@ -56,9 +56,9 @@ const styles = StyleSheet.create({
   valueText: {
     color: colors.mint,
     ...typography.display,
-    fontSize: 62,
+    fontSize: 56,
     includeFontPadding: false,
-    lineHeight: 66,
+    lineHeight: 58,
     textAlignVertical: 'center',
   },
   stepper: {

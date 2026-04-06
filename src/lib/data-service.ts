@@ -1,10 +1,14 @@
 import { startTransition } from 'react';
 
 import { format, formatISO } from 'date-fns';
+import { File as ExpoFile, Paths } from 'expo-file-system';
+import { getCalendars, getLocales } from 'expo-localization';
+import * as Sharing from 'expo-sharing';
 
 import { authService, supabase } from '@/src/lib/auth';
 import { calculateBubbleScore } from '@/src/lib/bubble-score';
 import { generateSessionTitle } from '@/src/lib/chat';
+import { getCycleInsight } from '@/src/lib/cycle-support';
 import {
   demoMessagesBySession,
   demoRecommendations,
@@ -17,13 +21,18 @@ import type {
   AnalyticsDetail,
   ChatMessage,
   ChatSession,
+  ContactRecord,
   DailyCheckin,
   DashboardSnapshot,
   InsightCard,
   JournalEntry,
+  CycleProfile,
+  MedicalId,
   NotificationItem,
   NotificationSettings,
   OnboardingFormValues,
+  PrivacySettings,
+  Profile,
   Recommendation,
   TrendPoint,
 } from '@/src/types/domain';
@@ -52,6 +61,29 @@ const getAccessToken = async () => {
   return data.session?.access_token ?? null;
 };
 
+const parseJsonSafely = (rawText: string) => {
+  if (!rawText) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(rawText) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+};
+
+const getDeviceContext = () => {
+  const locale = getLocales()[0];
+  const calendar = getCalendars()[0];
+
+  return {
+    locale: locale?.languageTag ?? 'en-MY',
+    region: locale?.regionCode ?? 'MY',
+    timezone: calendar?.timeZone ?? 'Asia/Kuala_Lumpur',
+  };
+};
+
 const invokeEdgeFunction = async <TResponse>(
   name: string,
   payload: Record<string, unknown>,
@@ -72,11 +104,14 @@ const invokeEdgeFunction = async <TResponse>(
     body: JSON.stringify(payload),
   });
 
-  const data = await response.json().catch(() => null);
+  const rawText = await response.text();
+  const data = parseJsonSafely(rawText);
 
   if (!response.ok) {
     throw new Error(
-      typeof data?.error === 'string' ? data.error : 'The server could not finish this request.',
+      typeof data?.error === 'string'
+        ? data.error
+        : rawText || 'The server could not finish this request.',
     );
   }
 
@@ -123,6 +158,23 @@ const moodLabel = (value?: number) => {
       return 'Very pleasant';
     default:
       return 'Unknown';
+  }
+};
+
+const inferMimeType = (uri: string) => {
+  const extension = uri.split('.').pop()?.toLowerCase();
+
+  switch (extension) {
+    case 'png':
+      return 'image/png';
+    case 'webp':
+      return 'image/webp';
+    case 'heic':
+      return 'image/heic';
+    case 'heif':
+      return 'image/heif';
+    default:
+      return 'image/jpeg';
   }
 };
 
@@ -175,6 +227,104 @@ const mapJournal = (row: {
   themes: Array.isArray(row.themes) ? (row.themes as string[]) : [],
   riskLevel: row.risk_level,
 });
+
+const mapContact = (row: {
+  id: string;
+  name: string;
+  relationship?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  is_favorite?: boolean | null;
+  notes?: string | null;
+}): ContactRecord => ({
+  id: row.id,
+  name: row.name,
+  relationship: row.relationship ?? 'Trusted person',
+  phone: row.phone ?? undefined,
+  email: row.email ?? undefined,
+  isFavorite: Boolean(row.is_favorite),
+  notes: row.notes ?? undefined,
+});
+
+const defaultPrivacySettings: PrivacySettings = {
+  privateMode: false,
+  hideNotificationPreviews: true,
+};
+
+const defaultCycleProfile: CycleProfile = {
+  enabled: false,
+  cycleLengthDays: 28,
+  periodLengthDays: 5,
+  irregularCycles: false,
+  symptoms: [],
+};
+
+const mapProfileWithPreferences = (
+  profileRow: Record<string, unknown>,
+  preferenceRow?: Record<string, unknown> | null,
+): Profile => ({
+  id: String(profileRow.id),
+  email: String(profileRow.email ?? ''),
+  fullName: String(profileRow.full_name ?? 'BubbleAI User'),
+  displayName: String(profileRow.display_name ?? 'Friend'),
+  pronouns: (profileRow.pronouns as string | null) ?? undefined,
+  birthYear: (profileRow.birth_year as number | null) ?? undefined,
+  genderIdentity: (profileRow.gender_identity as string | null) ?? undefined,
+  preferredVoice: (profileRow.preferred_voice as Profile['preferredVoice']) ?? 'neutral_calm',
+  avatarUrl: (profileRow.avatar_url as string | null) ?? undefined,
+  avatarTheme: (profileRow.avatar_theme as Profile['avatarTheme']) ?? 'mint',
+  medications:
+    typeof preferenceRow?.medications_text === 'string'
+      ? preferenceRow.medications_text
+          .split(',')
+          .map((value) => value.trim())
+          .filter(Boolean)
+      : [],
+  diagnoses:
+    typeof preferenceRow?.symptoms_text === 'string'
+      ? preferenceRow.symptoms_text
+          .split(',')
+          .map((value) => value.trim())
+          .filter(Boolean)
+      : [],
+  smokingHabits: (preferenceRow?.smoking_habits as string | null) ?? undefined,
+  drinkingHabits: (preferenceRow?.drinking_habits as string | null) ?? undefined,
+  menstrualSupportEnabled: Boolean(profileRow.menstrual_support_enabled),
+  privacyAcceptedAt: (profileRow.privacy_accepted_at as string | null) ?? undefined,
+  aiDisclaimerAcceptedAt: (profileRow.ai_disclaimer_accepted_at as string | null) ?? undefined,
+  crisisDisclaimerAcceptedAt: (profileRow.crisis_disclaimer_accepted_at as string | null) ?? undefined,
+  onboardingComplete: Boolean(profileRow.onboarding_complete),
+});
+
+const mapCycleProfile = (row: Record<string, unknown> | null | undefined): CycleProfile | null => {
+  if (!row) {
+    return null;
+  }
+
+  return {
+    enabled: Boolean(row.enabled),
+    lastPeriodStart: (row.last_period_start as string | null) ?? undefined,
+    cycleLengthDays: Number(row.cycle_length_days ?? 28),
+    periodLengthDays: Number(row.period_length_days ?? 5),
+    irregularCycles: Boolean(row.irregular_cycles),
+    symptoms:
+      typeof row.symptoms_text === 'string'
+        ? row.symptoms_text
+            .split(',')
+            .map((value) => value.trim())
+            .filter(Boolean)
+        : [],
+    notes: (row.notes as string | null) ?? undefined,
+  };
+};
+
+const mapPrivacySettings = (row: Record<string, unknown> | null | undefined): PrivacySettings =>
+  row
+    ? {
+        privateMode: Boolean(row.private_mode),
+        hideNotificationPreviews: Boolean(row.hide_notification_previews),
+      }
+    : defaultPrivacySettings;
 
 const getRecentCheckins = (checkins: DailyCheckin[], count = 7) =>
   [...checkins]
@@ -379,11 +529,14 @@ const buildAnalyticsFromData = (
 const buildRecommendationsFromData = (
   checkins: DailyCheckin[],
   journals: JournalEntry[],
+  cycleProfile?: CycleProfile | null,
 ): Recommendation[] => {
   const latest = getRecentCheckins(checkins, 1)[0];
+  const cycleInsight = getCycleInsight(cycleProfile);
 
   if (!latest) {
     return [
+      ...(cycleInsight ? [cycleInsight.recommendation] : []),
       {
         id: 'rec-first-checkin',
         kind: 'journal',
@@ -394,6 +547,10 @@ const buildRecommendationsFromData = (
   }
 
   const recommendations: Recommendation[] = [];
+
+  if (cycleInsight) {
+    recommendations.push(cycleInsight.recommendation);
+  }
 
   if (latest.stress >= 6) {
     recommendations.push({
@@ -593,12 +750,460 @@ export const dataService = {
     return buildAnalyticsFromData(metric, checkins, journals, period);
   },
 
-  async listNotifications(): Promise<NotificationItem[]> {
+  async getProfile(): Promise<Profile | null> {
     if (env.isMock) {
-      return useAppStore.getState().notifications;
+      return useAppStore.getState().profile;
     }
 
-    return [];
+    if (!supabase) {
+      return null;
+    }
+
+    const userId = getLiveUserId();
+    if (!userId) {
+      return null;
+    }
+
+    const [{ data: profileRow, error: profileError }, { data: preferenceRow, error: preferenceError }] =
+      await Promise.all([
+        supabase.from('profiles').select('*').eq('id', userId).maybeSingle(),
+        supabase.from('preferences').select('*').eq('user_id', userId).maybeSingle(),
+      ]);
+
+    if (profileError) {
+      throw profileError;
+    }
+
+    if (preferenceError) {
+      throw preferenceError;
+    }
+
+    if (!profileRow) {
+      return null;
+    }
+
+    const profile = mapProfileWithPreferences(profileRow, preferenceRow);
+    const session = useAppStore.getState().session;
+    if (session) {
+      useAppStore.getState().hydrateLiveSession(
+        {
+          ...session,
+          fullName: profile.fullName,
+          displayName: profile.displayName,
+          avatarUrl: profile.avatarUrl,
+          avatarTheme: profile.avatarTheme,
+          onboardingComplete: profile.onboardingComplete,
+        },
+        profile,
+      );
+    }
+    return profile;
+  },
+
+  async updateProfile(input: {
+    fullName: string;
+    displayName: string;
+    pronouns?: string;
+    birthYear?: number;
+    genderIdentity?: string;
+    preferredVoice: Profile['preferredVoice'];
+    avatarTheme?: Profile['avatarTheme'];
+    avatarUrl?: string;
+    smokingHabits?: string;
+    drinkingHabits?: string;
+    medicationsText?: string;
+    symptomsText?: string;
+  }) {
+    if (env.isMock) {
+      const profile = useAppStore.getState().profile;
+      if (!profile) {
+        return null;
+      }
+
+      const nextProfile: Profile = {
+        ...profile,
+        fullName: input.fullName,
+        displayName: input.displayName,
+        pronouns: input.pronouns,
+        birthYear: input.birthYear,
+        genderIdentity: input.genderIdentity,
+        preferredVoice: input.preferredVoice,
+        avatarTheme: input.avatarTheme ?? profile.avatarTheme ?? 'mint',
+        avatarUrl: input.avatarUrl ?? profile.avatarUrl,
+        smokingHabits: input.smokingHabits,
+        drinkingHabits: input.drinkingHabits,
+        medications:
+          input.medicationsText
+            ?.split(',')
+            .map((value) => value.trim())
+            .filter(Boolean) ?? [],
+        diagnoses:
+          input.symptomsText
+            ?.split(',')
+            .map((value) => value.trim())
+            .filter(Boolean) ?? [],
+      };
+      useAppStore.getState().hydrateLiveSession(
+        {
+          ...(useAppStore.getState().session ?? {
+            id: profile.id,
+            email: profile.email,
+            fullName: nextProfile.fullName,
+            displayName: nextProfile.displayName,
+            onboardingComplete: profile.onboardingComplete,
+          }),
+          fullName: nextProfile.fullName,
+          displayName: nextProfile.displayName,
+          avatarTheme: nextProfile.avatarTheme,
+          avatarUrl: nextProfile.avatarUrl,
+        },
+        nextProfile,
+      );
+      return nextProfile;
+    }
+
+    if (!supabase) {
+      return null;
+    }
+
+    const userId = getLiveUserId();
+    if (!userId) {
+      throw new Error('Please sign in again before updating your profile.');
+    }
+
+    const [{ error: profileError }, { error: preferenceError }] = await Promise.all([
+      supabase.from('profiles').upsert({
+        id: userId,
+        email: useAppStore.getState().session?.email,
+        full_name: input.fullName,
+        display_name: input.displayName,
+        pronouns: input.pronouns,
+        birth_year: input.birthYear,
+        gender_identity: input.genderIdentity,
+        preferred_voice: input.preferredVoice,
+        avatar_theme: input.avatarTheme ?? 'mint',
+        avatar_url: input.avatarUrl ?? null,
+      }),
+      supabase.from('preferences').upsert({
+        user_id: userId,
+        smoking_habits: input.smokingHabits,
+        drinking_habits: input.drinkingHabits,
+        medications_text: input.medicationsText,
+        symptoms_text: input.symptomsText,
+      }, {
+        onConflict: 'user_id',
+      }),
+    ]);
+
+    if (profileError) {
+      throw profileError;
+    }
+
+    if (preferenceError) {
+      throw preferenceError;
+    }
+
+    return dataService.getProfile();
+  },
+
+  async uploadAvatar(localUri: string) {
+    if (env.isMock) {
+      const profile = useAppStore.getState().profile;
+      if (profile) {
+        useAppStore.getState().hydrateLiveSession(
+          {
+            ...(useAppStore.getState().session ?? {
+              id: profile.id,
+              email: profile.email,
+              fullName: profile.fullName,
+              displayName: profile.displayName,
+              onboardingComplete: profile.onboardingComplete,
+            }),
+            avatarUrl: localUri,
+            avatarTheme: profile.avatarTheme,
+          },
+          { ...profile, avatarUrl: localUri },
+        );
+      }
+      return localUri;
+    }
+
+    if (!supabase) {
+      throw new Error('Supabase is not configured.');
+    }
+
+    const userId = getLiveUserId();
+    if (!userId) {
+      throw new Error('Please sign in again before uploading a photo.');
+    }
+
+    const imageFile = new ExpoFile(localUri);
+    if (!imageFile.exists) {
+      throw new Error('BubbleAI could not access that photo yet.');
+    }
+
+    const bytes = await imageFile.bytes();
+    const filePath = `${userId}/avatar-${Date.now()}.${inferMimeType(localUri).split('/')[1] ?? 'jpg'}`;
+    const contentType = inferMimeType(localUri);
+
+    const { error: uploadError } = await supabase.storage
+      .from('avatars')
+      .upload(filePath, bytes, {
+        cacheControl: '3600',
+        contentType,
+        upsert: true,
+      });
+
+    if (uploadError) {
+      throw uploadError;
+    }
+
+    const { data } = supabase.storage.from('avatars').getPublicUrl(filePath);
+    return data.publicUrl;
+  },
+
+  async getMedicalId(): Promise<MedicalId | null> {
+    if (env.isMock) {
+      return useAppStore.getState().medicalId;
+    }
+
+    if (!supabase) {
+      return null;
+    }
+
+    const userId = getLiveUserId();
+    if (!userId) {
+      return null;
+    }
+
+    const { data, error } = await supabase.from('medical_ids').select('*').eq('user_id', userId).maybeSingle();
+
+    if (error) {
+      throw error;
+    }
+
+    if (!data) {
+      return null;
+    }
+
+    const medicalId: MedicalId = {
+      bloodType: data.blood_type ?? undefined,
+      allergies: data.allergies ?? undefined,
+      conditions: data.conditions ?? undefined,
+      medications: data.medications ?? undefined,
+      notes: data.notes ?? undefined,
+      clinicianName: data.clinician_name ?? undefined,
+      clinicianPhone: data.clinician_phone ?? undefined,
+      clinicianAddress: data.clinician_address ?? undefined,
+      clinicianMapsUrl: data.clinician_maps_url ?? undefined,
+    };
+
+    useAppStore.getState().setMedicalId(medicalId);
+    return medicalId;
+  },
+
+  async saveMedicalId(values: MedicalId) {
+    if (env.isMock) {
+      useAppStore.getState().setMedicalId(values);
+      return values;
+    }
+
+    if (!supabase) {
+      throw new Error('Supabase is not configured.');
+    }
+
+    const userId = getLiveUserId();
+    if (!userId) {
+      throw new Error('Please sign in again before saving your medical ID.');
+    }
+
+    const { error } = await supabase.from('medical_ids').upsert({
+      user_id: userId,
+      blood_type: values.bloodType,
+      allergies: values.allergies,
+      conditions: values.conditions,
+      medications: values.medications,
+      notes: values.notes,
+      clinician_name: values.clinicianName,
+      clinician_phone: values.clinicianPhone,
+      clinician_address: values.clinicianAddress,
+      clinician_maps_url: values.clinicianMapsUrl,
+    }, {
+      onConflict: 'user_id',
+    });
+
+    if (error) {
+      throw error;
+    }
+
+    useAppStore.getState().setMedicalId(values);
+    return values;
+  },
+
+  async listTrustedContacts() {
+    if (env.isMock) {
+      return useAppStore.getState().trustedContacts;
+    }
+
+    if (!supabase) {
+      return [];
+    }
+
+    const userId = getLiveUserId();
+    if (!userId) {
+      return [];
+    }
+
+    const { data, error } = await supabase
+      .from('trusted_contacts')
+      .select('*')
+      .eq('user_id', userId)
+      .order('is_favorite', { ascending: false })
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      throw error;
+    }
+
+    return (data ?? []).map(mapContact);
+  },
+
+  async saveTrustedContact(contact: Omit<ContactRecord, 'id'> & { id?: string }) {
+    if (env.isMock) {
+      const next = {
+        ...contact,
+        id: contact.id ?? `trusted-${Date.now()}`,
+      } satisfies ContactRecord;
+      useAppStore.getState().upsertTrustedContact(next);
+      return next;
+    }
+
+    if (!supabase) {
+      throw new Error('Supabase is not configured.');
+    }
+
+    const userId = getLiveUserId();
+    if (!userId) {
+      throw new Error('Please sign in again before saving a contact.');
+    }
+
+    const { data, error } = await supabase
+      .from('trusted_contacts')
+      .upsert({
+        id: contact.id,
+        user_id: userId,
+        name: contact.name,
+        phone: contact.phone,
+        email: contact.email,
+        relationship: contact.relationship,
+        is_favorite: contact.isFavorite ?? false,
+      })
+      .select('*')
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
+    const next = mapContact(data);
+    useAppStore.getState().upsertTrustedContact(next);
+    return next;
+  },
+
+  async listClinicianContacts() {
+    if (env.isMock) {
+      return useAppStore.getState().clinicianContacts;
+    }
+
+    if (!supabase) {
+      return [];
+    }
+
+    const userId = getLiveUserId();
+    if (!userId) {
+      return [];
+    }
+
+    const { data, error } = await supabase
+      .from('clinician_contacts')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      throw error;
+    }
+
+    return (data ?? []).map((row) =>
+      mapContact({
+        ...row,
+        relationship: 'Clinician',
+        is_favorite: true,
+      }),
+    );
+  },
+
+  async saveClinicianContact(contact: Omit<ContactRecord, 'id'> & { id?: string }) {
+    if (env.isMock) {
+      const next = {
+        ...contact,
+        id: contact.id ?? `clinician-${Date.now()}`,
+      } satisfies ContactRecord;
+      useAppStore.getState().upsertClinicianContact(next);
+      return next;
+    }
+
+    if (!supabase) {
+      throw new Error('Supabase is not configured.');
+    }
+
+    const userId = getLiveUserId();
+    if (!userId) {
+      throw new Error('Please sign in again before saving a clinician.');
+    }
+
+    const { data, error } = await supabase
+      .from('clinician_contacts')
+      .upsert({
+        id: contact.id,
+        user_id: userId,
+        name: contact.name,
+        phone: contact.phone,
+        email: contact.email,
+        notes: contact.notes,
+      })
+      .select('*')
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
+    const next = mapContact({
+      ...data,
+      relationship: 'Clinician',
+      is_favorite: true,
+    });
+    useAppStore.getState().upsertClinicianContact(next);
+    return next;
+  },
+
+  async listNotifications(): Promise<NotificationItem[]> {
+    if (env.isMock) {
+      const { notifications, privacySettings } = useAppStore.getState();
+      return notifications.map((item) => ({
+        ...item,
+        body: privacySettings.hideNotificationPreviews ? 'Notification preview hidden for privacy.' : item.body,
+      }));
+    }
+
+    const privacySettings = useAppStore.getState().privacySettings;
+    const notifications = useAppStore.getState().notifications;
+
+    return notifications.map((item) => ({
+      ...item,
+      body: privacySettings.hideNotificationPreviews ? 'Notification preview hidden for privacy.' : item.body,
+    }));
   },
 
   async updateNotificationSettings(settings: Partial<NotificationSettings>) {
@@ -680,6 +1285,151 @@ export const dataService = {
     return useAppStore.getState().notificationSettings;
   },
 
+  async getPrivacySettings() {
+    if (env.isMock) {
+      return useAppStore.getState().privacySettings;
+    }
+
+    if (!supabase) {
+      return defaultPrivacySettings;
+    }
+
+    const userId = getLiveUserId();
+    if (!userId) {
+      return defaultPrivacySettings;
+    }
+
+    const { data, error } = await supabase
+      .from('privacy_settings')
+      .select('*')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (error) {
+      throw error;
+    }
+
+    const privacySettings = mapPrivacySettings(data);
+    useAppStore.getState().updatePrivacySettings(privacySettings);
+    return privacySettings;
+  },
+
+  async updatePrivacySettings(settings: Partial<PrivacySettings>) {
+    if (env.isMock) {
+      useAppStore.getState().updatePrivacySettings(settings);
+      return useAppStore.getState().privacySettings;
+    }
+
+    if (!supabase) {
+      return defaultPrivacySettings;
+    }
+
+    const userId = getLiveUserId();
+    if (!userId) {
+      throw new Error('Please sign in again to update privacy settings.');
+    }
+
+    const merged = { ...useAppStore.getState().privacySettings, ...settings };
+
+    const { data, error } = await supabase
+      .from('privacy_settings')
+      .upsert(
+        {
+          user_id: userId,
+          private_mode: merged.privateMode,
+          hide_notification_previews: merged.hideNotificationPreviews,
+        },
+        { onConflict: 'user_id' },
+      )
+      .select('*')
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
+    const privacySettings = mapPrivacySettings(data);
+    useAppStore.getState().updatePrivacySettings(privacySettings);
+    return privacySettings;
+  },
+
+  async getCycleProfile() {
+    if (env.isMock) {
+      return useAppStore.getState().cycleProfile;
+    }
+
+    if (!supabase) {
+      return null;
+    }
+
+    const userId = getLiveUserId();
+    if (!userId) {
+      return null;
+    }
+
+    const { data, error } = await supabase
+      .from('cycle_profiles')
+      .select('*')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (error) {
+      throw error;
+    }
+
+    const cycleProfile = mapCycleProfile(data);
+    useAppStore.getState().setCycleProfile(cycleProfile);
+    return cycleProfile ? getCycleInsight(cycleProfile) ?? cycleProfile : null;
+  },
+
+  async saveCycleProfile(cycleProfile: CycleProfile) {
+    if (env.isMock) {
+      const nextProfile = getCycleInsight(cycleProfile) ?? cycleProfile;
+      useAppStore.getState().setCycleProfile(nextProfile);
+      return nextProfile;
+    }
+
+    if (!supabase) {
+      return null;
+    }
+
+    const userId = getLiveUserId();
+    if (!userId) {
+      throw new Error('Please sign in again before saving cycle support.');
+    }
+
+    const { data, error } = await supabase
+      .from('cycle_profiles')
+      .upsert(
+        {
+          user_id: userId,
+          enabled: cycleProfile.enabled,
+          last_period_start: cycleProfile.lastPeriodStart ?? null,
+          cycle_length_days: cycleProfile.cycleLengthDays,
+          period_length_days: cycleProfile.periodLengthDays,
+          irregular_cycles: cycleProfile.irregularCycles,
+          symptoms_text: cycleProfile.symptoms.join(', '),
+          notes: cycleProfile.notes ?? null,
+        },
+        { onConflict: 'user_id' },
+      )
+      .select('*')
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
+    await supabase
+      .from('profiles')
+      .update({ menstrual_support_enabled: cycleProfile.enabled })
+      .eq('id', userId);
+
+    const nextProfile = getCycleInsight(mapCycleProfile(data)) ?? mapCycleProfile(data);
+    useAppStore.getState().setCycleProfile(nextProfile);
+    return nextProfile;
+  },
+
   async listJournalEntries() {
     if (!env.isMock && supabase) {
       const userId = getLiveUserId();
@@ -701,6 +1451,29 @@ export const dataService = {
     }
 
     return useAppStore.getState().journalEntries;
+  },
+
+  async listCheckins() {
+    if (!env.isMock && supabase) {
+      const userId = getLiveUserId();
+      if (!userId) {
+        return [];
+      }
+
+      const { data, error } = await supabase
+        .from('daily_checkins')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        throw error;
+      }
+
+      return (data ?? []).map(mapCheckin);
+    }
+
+    return useAppStore.getState().checkins;
   },
 
   async getJournalEntry(entryId: string) {
@@ -951,7 +1724,6 @@ export const dataService = {
       content,
       createdAt: formatISO(new Date()),
     };
-    state.addChatMessage(sessionId, userMessage);
 
     if (!env.isMock && supabase) {
       if (!isUuid(sessionId) || !getLiveUserId()) {
@@ -964,6 +1736,7 @@ export const dataService = {
           sessionId,
           message: content,
           mode: 'text',
+          clientContext: getDeviceContext(),
         },
       );
 
@@ -986,6 +1759,8 @@ export const dataService = {
       return assistantMessage;
     }
 
+    state.addChatMessage(sessionId, userMessage);
+
     await delay(500);
 
     const reply = assistantReply(content);
@@ -1004,9 +1779,73 @@ export const dataService = {
     return assistantMessage;
   },
 
+  async sendVoiceMessage(sessionId: string, audioUri: string) {
+    if (!env.isMock && supabase) {
+      if (!isUuid(sessionId) || !getLiveUserId()) {
+        throw new Error('Please sign in again before continuing the conversation.');
+      }
+
+      const accessToken = await getAccessToken();
+      if (!accessToken) {
+        throw new Error('Please sign in again before continuing the conversation.');
+      }
+
+      const formData = new FormData();
+      formData.append('sessionId', sessionId);
+      formData.append('clientContext', JSON.stringify(getDeviceContext()));
+      formData.append(
+        'audio',
+        {
+          uri: audioUri,
+          name: `voice-${Date.now()}.m4a`,
+          type: 'audio/m4a',
+        } as never,
+      );
+
+      const response = await fetch(`${env.supabaseUrl}/functions/v1/voice-chat-response`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          apikey: env.supabaseAnonKey,
+        },
+        body: formData,
+      });
+
+      const rawText = await response.text();
+      const data = parseJsonSafely(rawText);
+
+      if (!response.ok) {
+        throw new Error(
+          typeof data?.error === 'string'
+            ? data.error
+            : rawText || 'BubbleAI could not hear that message clearly.',
+        );
+      }
+
+      return {
+        transcript: String(data?.transcript ?? ''),
+        assistantText: String(data?.assistant_text ?? ''),
+        riskLevel: (data?.risk_level as ChatMessage['riskLevel']) ?? 'green',
+      };
+    }
+
+    await delay(700);
+    const transcript = 'I want to feel a little calmer tonight.';
+    const reply = assistantReply(transcript);
+    return {
+      transcript,
+      assistantText: reply.text,
+      riskLevel: reply.risk,
+    };
+  },
+
   async listRecommendations(): Promise<Recommendation[]> {
     if (env.isMock) {
-      return demoRecommendations;
+      return buildRecommendationsFromData(
+        useAppStore.getState().checkins,
+        useAppStore.getState().journalEntries,
+        useAppStore.getState().cycleProfile,
+      );
     }
 
     const userId = getLiveUserId();
@@ -1015,7 +1854,8 @@ export const dataService = {
     }
 
     const { checkins, journals } = await fetchLiveWellnessData(userId);
-    return buildRecommendationsFromData(checkins, journals);
+    const cycleProfile = await this.getCycleProfile();
+    return buildRecommendationsFromData(checkins, journals, cycleProfile);
   },
 
   async getVoiceTranscriptPreview() {
@@ -1025,7 +1865,7 @@ export const dataService = {
 
     return [
       'Tap the mic to start a calmer voice check-in.',
-      'BubbleAI will listen and respond once the live voice flow is connected.',
+      'BubbleAI will transcribe your voice and answer in the same conversation.',
     ];
   },
 
@@ -1064,11 +1904,34 @@ export const dataService = {
           medications_text: values.medicationsText,
           symptoms_text: values.symptomsText,
           notification_opt_in: values.notificationsEnabled,
+        }, {
+          onConflict: 'user_id',
         }),
         supabase.from('notification_settings').upsert({
           user_id: session.id,
           enabled: values.notificationsEnabled,
+        }, {
+          onConflict: 'user_id',
         }),
+        supabase.from('privacy_settings').upsert({
+          user_id: session.id,
+          private_mode: false,
+          hide_notification_previews: true,
+        }, {
+          onConflict: 'user_id',
+        }),
+        values.menstrualSupportEnabled
+          ? supabase.from('cycle_profiles').upsert({
+              user_id: session.id,
+              enabled: true,
+              cycle_length_days: 28,
+              period_length_days: 5,
+              irregular_cycles: false,
+              symptoms_text: '',
+            }, {
+              onConflict: 'user_id',
+            })
+          : Promise.resolve(),
         supabase.auth.updateUser({
           data: {
             full_name: values.fullName,
@@ -1081,5 +1944,67 @@ export const dataService = {
 
     useAppStore.getState().completeOnboarding(values);
     return useAppStore.getState().profile;
+  },
+
+  async exportMyData() {
+    const profile = await this.getProfile();
+    const notifications = await this.listNotifications();
+    const notificationSettings = await this.getNotificationSettings();
+    const privacySettings = await this.getPrivacySettings();
+    const cycleProfile = await this.getCycleProfile();
+    const medicalId = await this.getMedicalId();
+    const trustedContacts = await this.listTrustedContacts();
+    const clinicianContacts = await this.listClinicianContacts();
+    const journalEntries = await this.listJournalEntries();
+    const recommendations = await this.listRecommendations();
+    const chatSessions = await this.listChatSessions();
+    const checkins = await this.listCheckins();
+    const chats = await Promise.all(
+      chatSessions.map(async (session) => ({
+        session,
+        messages: await this.getChatMessages(session.id),
+      })),
+    );
+
+    const payload = {
+      exportedAt: new Date().toISOString(),
+      profile,
+      privacySettings,
+      cycleProfile,
+      notificationSettings,
+      notifications,
+      medicalId,
+      trustedContacts,
+      clinicianContacts,
+      checkins,
+      journalEntries,
+      recommendations,
+      chats,
+    };
+
+    const exportFile = new ExpoFile(Paths.cache, `bubbleai-export-${Date.now()}.json`);
+    exportFile.create({ intermediates: true, overwrite: true });
+    exportFile.write(JSON.stringify(payload, null, 2));
+
+    if (await Sharing.isAvailableAsync()) {
+      await Sharing.shareAsync(exportFile.uri, {
+        dialogTitle: 'Export BubbleAI data',
+        mimeType: 'application/json',
+      });
+    }
+
+    return exportFile.uri;
+  },
+
+  async deleteAccount() {
+    if (env.isMock) {
+      useAppStore.getState().clearSession();
+      return true;
+    }
+
+    await invokeEdgeFunction('delete-account', {});
+    await supabase?.auth.signOut();
+    useAppStore.getState().clearSession();
+    return true;
   },
 };

@@ -40,7 +40,7 @@ export default function OnboardingProfileScreen() {
         <FormField label="What should we call you?" value={displayName} onChangeText={setDisplayName} />
         <FormField label="Pronouns, if you want" value={pronouns} onChangeText={setPronouns} />
       </View>
-      <PillButton label="Continue" onPress={goNext} />
+      <PillButton label="Continue" onPress={goNext} style={styles.cta} />
     </Screen>
   );
 }
@@ -58,5 +58,8 @@ const styles = StyleSheet.create({
   },
   form: {
     gap: spacing.lg,
+  },
+  cta: {
+    marginTop: spacing.xxxl,
   },
 });

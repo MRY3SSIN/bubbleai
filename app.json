@@ -20,6 +20,7 @@
         "NSContactsUsageDescription": "BubbleAI uses your selected contacts for trusted support and clinician details.",
         "NSUserNotificationsUsageDescription": "BubbleAI uses notifications for check-ins, journaling, sleep, and gentle wellness reminders.",
         "NSMicrophoneUsageDescription": "BubbleAI uses your microphone for voice journaling and live voice support.",
+        "NSPhotoLibraryUsageDescription": "BubbleAI lets you choose a profile photo that feels personal and calm.",
         "ITSAppUsesNonExemptEncryption": false
       }
     },
@@ -49,6 +50,12 @@
       "expo-dev-client",
       "expo-secure-store",
       "expo-audio",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "BubbleAI lets you choose a profile photo that feels personal and calm."
+        }
+      ],
       "expo-localization",
       [
         "expo-notifications",

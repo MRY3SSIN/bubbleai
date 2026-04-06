@@ -17,7 +17,25 @@ export const detectRiskLevel = (content: string): RiskLevel => {
   return 'green';
 };
 
-export const fallbackSafetyResponse = (risk: RiskLevel) => {
+const buildGreenFallback = (content?: string) => {
+  const normalized = content?.toLowerCase() ?? '';
+
+  if (normalized.includes('sleep') || normalized.includes('night') || normalized.includes('bed')) {
+    return 'That sounds tiring. Let’s keep tonight simple, have a sip of water, dim one thing around you, and pick one small bedtime step you can actually do.';
+  }
+
+  if (normalized.includes('stress') || normalized.includes('overwhelm') || normalized.includes('overwhelmed')) {
+    return 'That sounds like a lot to carry. Let’s make it smaller, take one slow breath, put one task aside for later, and choose just one next step for the next ten minutes.';
+  }
+
+  if (normalized.includes('sad') || normalized.includes('low') || normalized.includes('mood')) {
+    return 'I hear that this feels heavy right now. Let’s keep it gentle, unclench your shoulders, take a few slow breaths, and do one kind thing for your body in the next five minutes.';
+  }
+
+  return 'I’m here with you. Let’s keep it simple, take one slow breath, have one sip of water, and choose one tiny next step together.';
+};
+
+export const fallbackSafetyResponse = (risk: RiskLevel, content?: string) => {
   if (risk === 'red') {
     return 'I’m concerned about your immediate safety. Please contact emergency services, a crisis line, or a trusted person right now. Stay with another person if you can.';
   }
@@ -26,6 +44,5 @@ export const fallbackSafetyResponse = (risk: RiskLevel) => {
     return 'I’m really glad you said that. Are you safe right now? Please reach out to a trusted person, your clinician, or a crisis line today.';
   }
 
-  return 'That sounds heavy. Let’s keep it simple, try one slow breath, one sip of water, and one tiny next step.';
+  return buildGreenFallback(content);
 };
-

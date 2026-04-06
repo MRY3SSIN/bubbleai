@@ -79,7 +79,7 @@ export default function OnboardingIdentityScreen() {
           ))}
         </View>
       </View>
-      <PillButton label="Continue" onPress={goNext} />
+      <PillButton label="Continue" onPress={goNext} style={styles.cta} />
     </Screen>
   );
 }
@@ -104,5 +104,8 @@ const styles = StyleSheet.create({
   },
   choiceStack: {
     gap: spacing.sm,
+  },
+  cta: {
+    marginTop: spacing.xxxl,
   },
 });

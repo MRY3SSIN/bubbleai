@@ -34,7 +34,7 @@ export const Screen = ({
         styles.content,
         padded && {
           paddingHorizontal: horizontalPadding,
-          paddingTop: spacing.lg,
+          paddingTop: spacing.xl,
           paddingBottom: spacing.xxxl,
         },
       ]}

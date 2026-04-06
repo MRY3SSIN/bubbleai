@@ -1,3 +1,4 @@
+import { useRouter } from 'expo-router';
 import { Alert, StyleSheet, Text, View } from 'react-native';
 
 import { AppCard } from '@/src/components/AppCard';
@@ -10,6 +11,7 @@ import { notificationsSupportedInCurrentRuntime, scheduleReminderPreview } from 
 import { colors, spacing, typography } from '@/src/theme';
 
 export default function SettingsScreen() {
+  const router = useRouter();
   const profile = useAppStore((state) => state.profile);
 
   return (
@@ -17,10 +19,13 @@ export default function SettingsScreen() {
       <BackHeader title="Settings" />
       <Text style={styles.sectionTitle}>General settings</Text>
       <View style={styles.stack}>
-        <SettingsRow title="Update profile" subtitle={profile?.displayName} />
-        <SettingsRow title="Notification settings" subtitle="Reminders, quiet hours, and categories." />
+        <SettingsRow title="Update profile" subtitle={profile?.displayName} onPress={() => router.push('/settings/profile')} />
+        <SettingsRow title="Notification settings" subtitle="Reminders, quiet hours, and categories." onPress={() => router.push('/(tabs)/notifications')} />
         <SettingsRow title="Preferred voice" subtitle={profile?.preferredVoice ?? 'Neutral, calm'} />
-        <SettingsRow title="Privacy settings" subtitle="Export data, delete account, and AI disclosures." />
+        <SettingsRow title="Privacy settings" subtitle="Private mode, exports, and account controls." onPress={() => router.push('/settings/privacy')} />
+        <SettingsRow title="Cycle-aware support" subtitle="Optional menstrual wellness guidance." onPress={() => router.push('/settings/cycle-support')} />
+        <SettingsRow title="Medical ID" subtitle="Allergies, conditions, and clinician details." onPress={() => router.push('/settings/medical-id')} />
+        <SettingsRow title="Emergency contacts" subtitle="Trusted people you can reach quickly." onPress={() => router.push('/settings/emergency-contacts')} />
       </View>
 
       <Text style={styles.sectionTitle}>Safety and privacy</Text>

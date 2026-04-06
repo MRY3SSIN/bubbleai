@@ -12,6 +12,7 @@ import { SectionHeader } from '@/src/components/layout/SectionHeader';
 import { Screen } from '@/src/components/layout/Screen';
 import { useDashboard, useRecommendations } from '@/src/features/dashboard/use-dashboard';
 import { env } from '@/src/lib/env';
+import { getCycleInsight } from '@/src/lib/cycle-support';
 import { useAppStore } from '@/src/lib/app-store';
 import { colors, radii, spacing, typography } from '@/src/theme';
 
@@ -21,8 +22,11 @@ export default function HomeScreen() {
   const { data: dashboard } = useDashboard();
   const { data: recommendations } = useRecommendations();
   const profile = useAppStore((state) => state.profile);
+  const privacySettings = useAppStore((state) => state.privacySettings);
+  const cycleProfile = useAppStore((state) => state.cycleProfile);
   const isCompact = width < 390;
   const isVeryCompact = width < 350;
+  const cycleInsight = getCycleInsight(cycleProfile);
 
   if (!dashboard || !profile) {
     return null;
@@ -35,8 +39,13 @@ export default function HomeScreen() {
         <View style={styles.greetingWrap}>
           <Text style={styles.date}>{dashboard.greetingDate}</Text>
           <Text style={[styles.greeting, isVeryCompact && styles.greetingCompact]}>
-            Good Morning, {profile.displayName}
+            {privacySettings.privateMode ? 'Good Morning' : `Good Morning, ${profile.displayName}`}
           </Text>
+          {privacySettings.privateMode ? (
+            <Text style={styles.privateModeHint}>
+              Private mode is on, your name stays hidden on shared surfaces.
+            </Text>
+          ) : null}
         </View>
         <View style={[styles.actions, isCompact && styles.actionsCompact]}>
           <Pressable onPress={() => router.push('/(tabs)/notifications')} style={styles.circle}>
@@ -72,6 +81,19 @@ export default function HomeScreen() {
           </Pressable>
         ))}
       </View>
+
+      {cycleInsight ? (
+        <>
+          <SectionHeader title="Cycle-aware support" />
+          <AppCard accent style={styles.cycleCard}>
+            <Text style={styles.cycleTitle}>{cycleInsight.title}</Text>
+            <Text style={styles.cycleBody}>{cycleInsight.body}</Text>
+            <Pressable onPress={() => router.push('/settings/cycle-support')} style={styles.cycleLink}>
+              <Text style={styles.cycleLinkLabel}>Update cycle support</Text>
+            </Pressable>
+          </AppCard>
+        </>
+      ) : null}
 
       <SectionHeader eyebrow="Bubble Score" title={`${dashboard.bubbleScore.total}`} actionLabel="See details" onPressAction={() => router.push('/analytics/bubble_score')} />
       <View style={[styles.metrics, isCompact && styles.metricsCompact]}>
@@ -150,6 +172,11 @@ const styles = StyleSheet.create({
     fontSize: 30,
     lineHeight: 34,
   },
+  privateModeHint: {
+    color: colors.inkMuted,
+    marginTop: spacing.sm,
+    ...typography.caption,
+  },
   heroCard: {
     gap: spacing.lg,
     marginBottom: spacing.xl,
@@ -225,6 +252,26 @@ const styles = StyleSheet.create({
   },
   metricsCompact: {
     flexDirection: 'column',
+  },
+  cycleCard: {
+    marginBottom: spacing.xl,
+  },
+  cycleTitle: {
+    color: colors.ink,
+    ...typography.h3,
+  },
+  cycleBody: {
+    color: colors.inkMuted,
+    marginTop: spacing.sm,
+    ...typography.body,
+  },
+  cycleLink: {
+    alignSelf: 'flex-start',
+    marginTop: spacing.lg,
+  },
+  cycleLinkLabel: {
+    color: colors.mintDeep,
+    ...typography.label,
   },
   stack: {
     gap: spacing.md,

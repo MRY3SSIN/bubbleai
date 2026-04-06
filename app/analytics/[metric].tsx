@@ -15,11 +15,22 @@ export default function AnalyticsDetailScreen() {
   const { width } = useWindowDimensions();
   const [period, setPeriod] = useState<'week' | 'month' | '6_month' | 'year'>('week');
   const { data } = useAnalyticsDetail(metric, period);
-  const isCompact = width < 390;
 
   if (!data) {
     return null;
   }
+
+  const isCompact = width < 390;
+  const maxTrendValue = Math.max(...data.trend.map((point) => point.value), 1);
+  const chartCeiling = Math.max(data.gaugeMax, maxTrendValue * 1.35, 1);
+  const trendCount = Math.max(data.trend.length, 1);
+  const barWidth = Math.min(isCompact ? 34 : 42, Math.max(22, (width - 112) / trendCount));
+  const gaugeLabel =
+    data.metric === 'mood'
+      ? `${Math.max(0, Math.round(data.gaugeValue || 0))}/5`
+      : data.value.replace(/[^0-9.]/g, '') || data.value;
+  const highlightColor =
+    data.metric === 'stress' ? colors.danger : data.metric === 'sleep' ? colors.accent : colors.mint;
 
   return (
     <Screen>
@@ -36,12 +47,19 @@ export default function AnalyticsDetailScreen() {
           value={period}
         />
         <GaugeChart
-          centerLabel={data.value.replace(/[^0-9.]/g, '') || data.value}
+          centerLabel={gaugeLabel}
           max={data.gaugeMax}
           size={isCompact ? 220 : 260}
           value={data.gaugeValue}
         />
-        <Text style={styles.heroValue}>{data.value}</Text>
+        <Text
+          adjustsFontSizeToFit
+          minimumFontScale={0.7}
+          numberOfLines={2}
+          style={[styles.heroValue, data.metric === 'mood' && styles.heroValueLong]}
+        >
+          {data.value}
+        </Text>
         <Text style={styles.heroSubtitle}>{data.subtitle}</Text>
       </AppCard>
       <Text style={styles.sectionTitle}>BubbleAI Insight</Text>
@@ -50,13 +68,16 @@ export default function AnalyticsDetailScreen() {
         <Text style={styles.cardBody}>{data.insight}</Text>
         <View style={[styles.bars, isCompact && styles.barsCompact]}>
           {data.trend.map((point) => (
-            <View key={point.label} style={styles.barWrap}>
+            <View key={point.label} style={[styles.barWrap, { width: barWidth }]}>
               <View
                 style={[
                   styles.bar,
                   {
-                    height: 18 + point.value * 12,
-                    backgroundColor: point.highlight ? colors.danger : colors.border,
+                    height:
+                      point.value <= 0
+                        ? 10
+                        : 18 + (point.value / chartCeiling) * (isCompact ? 88 : 104),
+                    backgroundColor: point.highlight ? highlightColor : colors.border,
                   },
                 ]}
               />
@@ -76,7 +97,13 @@ const styles = StyleSheet.create({
   },
   heroValue: {
     color: colors.ink,
+    textAlign: 'center',
     ...typography.h1,
+  },
+  heroValueLong: {
+    fontSize: 24,
+    lineHeight: 30,
+    marginTop: spacing.sm,
   },
   heroSubtitle: {
     color: colors.inkMuted,
@@ -101,13 +128,13 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     flexDirection: 'row',
     gap: spacing.sm,
+    justifyContent: 'space-between',
   },
   barsCompact: {
     gap: spacing.xs,
   },
   barWrap: {
     alignItems: 'center',
-    flex: 1,
     gap: spacing.xs,
   },
   bar: {

@@ -82,7 +82,7 @@ export default function OnboardingConsentsScreen() {
           onPress={() => setCrisisDisclaimerAccepted((current) => !current)}
         />
       </View>
-      <PillButton label="Finish onboarding" onPress={complete} />
+      <PillButton label="Finish onboarding" onPress={complete} style={styles.cta} />
     </Screen>
   );
 }
@@ -96,5 +96,8 @@ const styles = StyleSheet.create({
   stack: {
     gap: spacing.md,
     marginBottom: spacing.xxxl,
+  },
+  cta: {
+    marginTop: spacing.lg,
   },
 });

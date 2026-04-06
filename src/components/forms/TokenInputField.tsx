@@ -10,6 +10,8 @@ type TokenInputFieldProps = {
   placeholder?: string;
   value: string;
   onChange: (value: string) => void;
+  suggestions?: string[];
+  maxSuggestions?: number;
 };
 
 const normalizeTokens = (value: string) =>
@@ -24,9 +26,23 @@ export const TokenInputField = ({
   placeholder,
   value,
   onChange,
+  suggestions = [],
+  maxSuggestions = 10,
 }: TokenInputFieldProps) => {
   const [draft, setDraft] = useState('');
   const tokens = useMemo(() => normalizeTokens(value), [value]);
+  const filteredSuggestions = useMemo(() => {
+    const query = draft.trim().toLowerCase();
+
+    if (!query) {
+      return [];
+    }
+
+    return suggestions
+      .filter((item) => !tokens.includes(item))
+      .filter((item) => item.toLowerCase().includes(query))
+      .slice(0, maxSuggestions);
+  }, [draft, maxSuggestions, suggestions, tokens]);
 
   const commitDraft = () => {
     const nextToken = draft.trim();
@@ -71,6 +87,22 @@ export const TokenInputField = ({
             <Text style={styles.addLabel}>Save</Text>
           </Pressable>
         </View>
+        {filteredSuggestions.length ? (
+          <View style={styles.suggestions}>
+            {filteredSuggestions.map((suggestion) => (
+              <Pressable
+                key={suggestion}
+                onPress={() => {
+                  onChange(Array.from(new Set([...tokens, suggestion])).join(', '));
+                  setDraft('');
+                }}
+                style={styles.suggestionChip}
+              >
+                <Text style={styles.suggestionLabel}>{suggestion}</Text>
+              </Pressable>
+            ))}
+          </View>
+        ) : null}
       </View>
       {hint ? <Text style={styles.hint}>{hint}</Text> : null}
     </View>
@@ -116,6 +148,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     gap: spacing.sm,
+  },
+  suggestions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
+  },
+  suggestionChip: {
+    backgroundColor: colors.backgroundAlt,
+    borderRadius: radii.pill,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 8,
+  },
+  suggestionLabel: {
+    color: colors.mintDeep,
+    ...typography.caption,
   },
   input: {
     color: colors.ink,

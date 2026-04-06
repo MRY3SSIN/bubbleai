@@ -68,7 +68,7 @@ export default function OnboardingHealthScreen() {
           value={symptomsText}
         />
       </View>
-      <PillButton label="Continue" onPress={goNext} />
+      <PillButton label="Continue" onPress={goNext} style={styles.cta} />
     </Screen>
   );
 }
@@ -90,5 +90,8 @@ const styles = StyleSheet.create({
   sectionTitle: {
     color: colors.ink,
     ...typography.h3,
+  },
+  cta: {
+    marginTop: spacing.xxxl,
   },
 });

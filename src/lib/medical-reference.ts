@@ -1,0 +1,107 @@
+export type ClinicDirectoryEntry = {
+  name: string;
+  type: 'government_hospital' | 'private_hospital' | 'health_clinic';
+  address?: string;
+  phone?: string;
+  state: string;
+  mapsQuery?: string;
+};
+
+export const bloodTypeOptions = [
+  { label: 'A+', value: 'A+' },
+  { label: 'A-', value: 'A-' },
+  { label: 'B+', value: 'B+' },
+  { label: 'B-', value: 'B-' },
+  { label: 'AB+', value: 'AB+' },
+  { label: 'AB-', value: 'AB-' },
+  { label: 'O+', value: 'O+' },
+  { label: 'O-', value: 'O-' },
+];
+
+export const commonAllergies = [
+  'Peanuts','Tree nuts','Milk','Eggs','Soy','Wheat','Fish','Shellfish','Sesame','Corn',
+  'Strawberries','Kiwi','Banana','Avocado','Apple','Peach','Pear','Cherry','Tomato','Coconut',
+  'Mustard','Celery','Garlic','Onion','Chocolate','Coffee','Tea','Food colouring','Sulfites','MSG',
+  'Penicillin','Amoxicillin','Cephalosporins','Sulfa drugs','Aspirin','Ibuprofen','NSAIDs','Paracetamol','Codeine','Morphine',
+  'Contrast dye','Local anesthetics','Latex','Nickel','Fragrances','Cosmetics','Hair dye','Adhesives','Detergents','Disinfectants',
+  'Pollen','Grass pollen','Tree pollen','Weed pollen','Dust mites','Mold','Cat dander','Dog dander','Cockroach','Bird feathers',
+  'Bee stings','Wasp stings','Mosquito bites','Ant bites','Flea bites','Sunlight','Cold','Heat','Chlorine','Smoke',
+  'Perfume','Air freshener','Paint','Petrol fumes','Cleaning products','Cigarette smoke','Vape aerosol','Humidity','Exercise','Stress',
+  'Gelatin','Yeast','Mushrooms','Lentils','Chickpeas','Cashews','Almonds','Walnuts','Pistachios','Hazelnuts',
+  'Crab','Prawn','Lobster','Clams','Oysters','Scallops','Tuna','Salmon','Anchovies','Seaweed',
+];
+
+export const malaysiaClinicDirectory: ClinicDirectoryEntry[] = [
+  { name: 'Hospital Ampang', type: 'government_hospital', state: 'Selangor', address: 'Jalan Mewah Utara, Pandan Mewah, 68000 Ampang Jaya, Selangor', mapsQuery: 'Hospital Ampang Selangor' },
+  { name: 'Hospital Angkatan Tentera Tuanku Mizan', type: 'government_hospital', state: 'Kuala Lumpur', address: 'Wangsa Maju, 53300 Kuala Lumpur', mapsQuery: 'Hospital Angkatan Tentera Tuanku Mizan Kuala Lumpur' },
+  { name: 'Hospital Bintulu', type: 'government_hospital', state: 'Sarawak', address: '97000 Bintulu, Sarawak', mapsQuery: 'Hospital Bintulu Sarawak' },
+  { name: 'Hospital Canselor Tuanku Muhriz UKM', type: 'government_hospital', state: 'Kuala Lumpur', address: 'Cheras, 56000 Kuala Lumpur', mapsQuery: 'Hospital Canselor Tuanku Muhriz Kuala Lumpur' },
+  { name: 'Hospital Duchess of Kent', type: 'government_hospital', state: 'Sabah', address: '90000 Sandakan, Sabah', mapsQuery: 'Hospital Duchess of Kent Sandakan' },
+  { name: 'Hospital Enche’ Besar Hajjah Khalsom', type: 'government_hospital', state: 'Johor', address: '86000 Kluang, Johor', mapsQuery: 'Hospital Enche Besar Hajjah Khalsom Kluang' },
+  { name: 'Hospital Kajang', type: 'government_hospital', state: 'Selangor', address: 'Jalan Semenyih, 43000 Kajang, Selangor', mapsQuery: 'Hospital Kajang Selangor' },
+  { name: 'Hospital Kemaman', type: 'government_hospital', state: 'Terengganu', address: '24000 Kemaman, Terengganu', mapsQuery: 'Hospital Kemaman Terengganu' },
+  { name: 'Hospital Keningau', type: 'government_hospital', state: 'Sabah', address: '89000 Keningau, Sabah', mapsQuery: 'Hospital Keningau Sabah' },
+  { name: 'Hospital Kuala Lipis', type: 'government_hospital', state: 'Pahang', address: '27200 Kuala Lipis, Pahang', mapsQuery: 'Hospital Kuala Lipis Pahang' },
+  { name: 'Hospital Kuala Lumpur', type: 'government_hospital', state: 'Kuala Lumpur', address: 'Jalan Pahang, 50586 Kuala Lumpur', phone: '+60326155555', mapsQuery: 'Hospital Kuala Lumpur' },
+  { name: 'Hospital Kulim', type: 'government_hospital', state: 'Kedah', address: '09000 Kulim, Kedah', mapsQuery: 'Hospital Kulim Kedah' },
+  { name: 'Hospital Lahad Datu', type: 'government_hospital', state: 'Sabah', address: '91100 Lahad Datu, Sabah', mapsQuery: 'Hospital Lahad Datu Sabah' },
+  { name: 'Hospital Melaka', type: 'government_hospital', state: 'Melaka', address: '75400 Melaka', mapsQuery: 'Hospital Melaka' },
+  { name: 'Hospital Miri', type: 'government_hospital', state: 'Sarawak', address: '98000 Miri, Sarawak', mapsQuery: 'Hospital Miri Sarawak' },
+  { name: 'Hospital Pakar Sultanah Fatimah', type: 'government_hospital', state: 'Johor', address: '84000 Muar, Johor', mapsQuery: 'Hospital Pakar Sultanah Fatimah Muar' },
+  { name: 'Hospital Pulau Pinang', type: 'government_hospital', state: 'Pulau Pinang', address: 'Jalan Residensi, 10990 George Town, Pulau Pinang', mapsQuery: 'Hospital Pulau Pinang' },
+  { name: 'Hospital Putrajaya', type: 'government_hospital', state: 'Putrajaya', address: 'Presint 7, 62250 Putrajaya', mapsQuery: 'Hospital Putrajaya' },
+  { name: 'Hospital Queen Elizabeth', type: 'government_hospital', state: 'Sabah', address: '88300 Kota Kinabalu, Sabah', mapsQuery: 'Hospital Queen Elizabeth Kota Kinabalu' },
+  { name: 'Hospital Raja Perempuan Zainab II', type: 'government_hospital', state: 'Kelantan', address: '15586 Kota Bharu, Kelantan', mapsQuery: 'Hospital Raja Perempuan Zainab II' },
+  { name: 'Hospital Raja Permaisuri Bainun', type: 'government_hospital', state: 'Perak', address: '30450 Ipoh, Perak', mapsQuery: 'Hospital Raja Permaisuri Bainun Ipoh' },
+  { name: 'Hospital Segamat', type: 'government_hospital', state: 'Johor', address: '85000 Segamat, Johor', mapsQuery: 'Hospital Segamat Johor' },
+  { name: 'Hospital Seberang Jaya', type: 'government_hospital', state: 'Pulau Pinang', address: '13700 Perai, Pulau Pinang', mapsQuery: 'Hospital Seberang Jaya' },
+  { name: 'Hospital Selayang', type: 'government_hospital', state: 'Selangor', address: '68100 Batu Caves, Selangor', mapsQuery: 'Hospital Selayang' },
+  { name: 'Hospital Serdang', type: 'government_hospital', state: 'Selangor', address: '43000 Kajang, Selangor', mapsQuery: 'Hospital Serdang' },
+  { name: 'Hospital Seri Manjung', type: 'government_hospital', state: 'Perak', address: '32040 Seri Manjung, Perak', mapsQuery: 'Hospital Seri Manjung' },
+  { name: 'Hospital Shah Alam', type: 'government_hospital', state: 'Selangor', address: 'Section 7, 40000 Shah Alam, Selangor', mapsQuery: 'Hospital Shah Alam' },
+  { name: 'Hospital Sibu', type: 'government_hospital', state: 'Sarawak', address: '96000 Sibu, Sarawak', mapsQuery: 'Hospital Sibu Sarawak' },
+  { name: 'Hospital Sultan Abdul Halim', type: 'government_hospital', state: 'Kedah', address: '08000 Sungai Petani, Kedah', mapsQuery: 'Hospital Sultan Abdul Halim Sungai Petani' },
+  { name: 'Hospital Sultan Haji Ahmad Shah', type: 'government_hospital', state: 'Pahang', address: '28000 Temerloh, Pahang', mapsQuery: 'Hospital Sultan Haji Ahmad Shah Temerloh' },
+  { name: 'Hospital Sultan Ismail', type: 'government_hospital', state: 'Johor', address: '81100 Johor Bahru, Johor', mapsQuery: 'Hospital Sultan Ismail Johor Bahru' },
+  { name: 'Hospital Sultan Ismail Petra', type: 'government_hospital', state: 'Kelantan', address: '18000 Kuala Krai, Kelantan', mapsQuery: 'Hospital Sultan Ismail Petra Kuala Krai' },
+  { name: 'Hospital Sultanah Aminah', type: 'government_hospital', state: 'Johor', address: '80100 Johor Bahru, Johor', mapsQuery: 'Hospital Sultanah Aminah Johor Bahru' },
+  { name: 'Hospital Sultanah Bahiyah', type: 'government_hospital', state: 'Kedah', address: '05460 Alor Setar, Kedah', mapsQuery: 'Hospital Sultanah Bahiyah Alor Setar' },
+  { name: 'Hospital Sultanah Maliha', type: 'government_hospital', state: 'Kedah', address: '07000 Langkawi, Kedah', mapsQuery: 'Hospital Sultanah Maliha Langkawi' },
+  { name: 'Hospital Sultanah Nora Ismail', type: 'government_hospital', state: 'Johor', address: '83000 Batu Pahat, Johor', mapsQuery: 'Hospital Sultanah Nora Ismail Batu Pahat' },
+  { name: 'Hospital Sultanah Nur Zahirah', type: 'government_hospital', state: 'Terengganu', address: '20400 Kuala Terengganu, Terengganu', mapsQuery: 'Hospital Sultanah Nur Zahirah' },
+  { name: 'Hospital Sungai Buloh', type: 'government_hospital', state: 'Selangor', address: '47000 Sungai Buloh, Selangor', mapsQuery: 'Hospital Sungai Buloh' },
+  { name: 'Hospital Taiping', type: 'government_hospital', state: 'Perak', address: '34000 Taiping, Perak', mapsQuery: 'Hospital Taiping' },
+  { name: 'Hospital Tanah Merah', type: 'government_hospital', state: 'Kelantan', address: '17500 Tanah Merah, Kelantan', mapsQuery: 'Hospital Tanah Merah Kelantan' },
+  { name: 'Hospital Tawau', type: 'government_hospital', state: 'Sabah', address: '91000 Tawau, Sabah', mapsQuery: 'Hospital Tawau Sabah' },
+  { name: 'Hospital Teluk Intan', type: 'government_hospital', state: 'Perak', address: '36000 Teluk Intan, Perak', mapsQuery: 'Hospital Teluk Intan' },
+  { name: 'Hospital Tengku Ampuan Afzan', type: 'government_hospital', state: 'Pahang', address: '25100 Kuantan, Pahang', mapsQuery: 'Hospital Tengku Ampuan Afzan Kuantan' },
+  { name: 'Hospital Tengku Ampuan Rahimah', type: 'government_hospital', state: 'Selangor', address: '41200 Klang, Selangor', mapsQuery: 'Hospital Tengku Ampuan Rahimah Klang' },
+  { name: 'Hospital Tuanku Ampuan Najihah', type: 'government_hospital', state: 'Negeri Sembilan', address: '72000 Kuala Pilah, Negeri Sembilan', mapsQuery: 'Hospital Tuanku Ampuan Najihah Kuala Pilah' },
+  { name: 'Hospital Tuanku Fauziah', type: 'government_hospital', state: 'Perlis', address: '01000 Kangar, Perlis', mapsQuery: 'Hospital Tuanku Fauziah Kangar' },
+  { name: 'Hospital Tuanku Jaafar', type: 'government_hospital', state: 'Negeri Sembilan', address: '70300 Seremban, Negeri Sembilan', mapsQuery: 'Hospital Tuanku Jaafar Seremban' },
+  { name: 'Hospital Umum Sarawak', type: 'government_hospital', state: 'Sarawak', address: '93586 Kuching, Sarawak', mapsQuery: 'Hospital Umum Sarawak' },
+  { name: 'Hospital Universiti Sains Malaysia', type: 'government_hospital', state: 'Kelantan', address: '16150 Kubang Kerian, Kelantan', mapsQuery: 'Hospital Universiti Sains Malaysia' },
+  { name: 'Pantai Hospital Kuala Lumpur', type: 'private_hospital', state: 'Kuala Lumpur', address: '59100 Kuala Lumpur', phone: '+60322960888', mapsQuery: 'Pantai Hospital Kuala Lumpur' },
+  { name: 'Pantai Hospital Penang', type: 'private_hospital', state: 'Pulau Pinang', address: '11900 Bayan Baru, Pulau Pinang', mapsQuery: 'Pantai Hospital Penang' },
+  { name: 'Prince Court Medical Centre', type: 'private_hospital', state: 'Kuala Lumpur', address: '50450 Kuala Lumpur', phone: '+60321600000', mapsQuery: 'Prince Court Medical Centre Kuala Lumpur' },
+  { name: 'Gleneagles Hospital Kuala Lumpur', type: 'private_hospital', state: 'Kuala Lumpur', address: '50450 Kuala Lumpur', phone: '+60341413000', mapsQuery: 'Gleneagles Hospital Kuala Lumpur' },
+  { name: 'Sunway Medical Centre', type: 'private_hospital', state: 'Selangor', address: '47500 Subang Jaya, Selangor', phone: '+60374919191', mapsQuery: 'Sunway Medical Centre Subang Jaya' },
+  { name: 'Subang Jaya Medical Centre', type: 'private_hospital', state: 'Selangor', address: '47500 Subang Jaya, Selangor', phone: '+60356391212', mapsQuery: 'Subang Jaya Medical Centre' },
+  { name: 'Thomson Hospital Kota Damansara', type: 'private_hospital', state: 'Selangor', address: '47810 Petaling Jaya, Selangor', phone: '+60362871212', mapsQuery: 'Thomson Hospital Kota Damansara' },
+  { name: 'KPJ Johor Specialist Hospital', type: 'private_hospital', state: 'Johor', address: '80100 Johor Bahru, Johor', mapsQuery: 'KPJ Johor Specialist Hospital' },
+  { name: 'KPJ Damansara Specialist Hospital', type: 'private_hospital', state: 'Kuala Lumpur', address: '52200 Kuala Lumpur', mapsQuery: 'KPJ Damansara Specialist Hospital' },
+  { name: 'Aurelius Hospital Alor Setar', type: 'private_hospital', state: 'Kedah', address: '05250 Alor Setar, Kedah', mapsQuery: 'Aurelius Hospital Alor Setar' },
+  { name: 'KPJ Penang Specialist Hospital', type: 'private_hospital', state: 'Pulau Pinang', address: '11600 George Town, Pulau Pinang', mapsQuery: 'KPJ Penang Specialist Hospital' },
+  { name: 'Klinik Kesihatan Kelana Jaya', type: 'health_clinic', state: 'Selangor', address: 'Lot 38294, Jalan SS6/3A, Kelana Jaya, 47301 Petaling, Selangor', phone: '03-78045001', mapsQuery: 'Klinik Kesihatan Kelana Jaya' },
+  { name: 'Klinik Kesihatan Kota Damansara', type: 'health_clinic', state: 'Selangor', address: 'No. 58 Tingkat 3, Jalan Pekaka 8/3, Kota Damansara, 47810 Petaling, Selangor', phone: '03-61401078', mapsQuery: 'Klinik Kesihatan Kota Damansara' },
+  { name: 'Klinik Kesihatan Puchong', type: 'health_clinic', state: 'Selangor', address: 'Batu 14, Jalan Puchong, 47100 Puchong, Selangor', phone: '03-80611814', mapsQuery: 'Klinik Kesihatan Puchong' },
+  { name: 'Klinik Kesihatan Seri Kembangan', type: 'health_clinic', state: 'Selangor', address: 'Jalan Besar, 43300 Seri Kembangan, Selangor', phone: '03-89455929', mapsQuery: 'Klinik Kesihatan Seri Kembangan' },
+  { name: 'Klinik Kesihatan Sungai Buloh', type: 'health_clinic', state: 'Selangor', address: 'Lot 1853, Kg Melayu Sg Buloh, 47000 Sungai Buloh, Selangor', phone: '03-61401293', mapsQuery: 'Klinik Kesihatan Sungai Buloh' },
+  { name: 'Klinik Kesihatan Taman Medan', type: 'health_clinic', state: 'Selangor', address: 'Jalan PJS 2C/5, Taman Dato Harun, 46000 Petaling Jaya, Selangor', phone: '03-77819001', mapsQuery: 'Klinik Kesihatan Taman Medan' },
+  { name: 'Klinik Kesihatan UTC Selangor', type: 'health_clinic', state: 'Selangor', address: 'Lot G, Anggerik Mall, Jalan 14/7, Seksyen 14, 40000 Shah Alam, Selangor', phone: '03-55250200', mapsQuery: 'Klinik Kesihatan UTC Selangor' },
+  { name: 'Klinik Kesihatan Kg Melayu Subang', type: 'health_clinic', state: 'Selangor', address: 'Jalan Merbau, Kg Melayu Subang, 40152 Petaling, Selangor', phone: '03-78472461', mapsQuery: 'Klinik Kesihatan Kg Melayu Subang' },
+];
+
+export const sortedMalaysiaClinicDirectory = [...malaysiaClinicDirectory].sort((a, b) =>
+  a.name.localeCompare(b.name),
+);

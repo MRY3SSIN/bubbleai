@@ -5,11 +5,13 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 import {
   demoChatSessions,
   demoCheckins,
+  demoCycleProfile,
   demoContacts,
   demoJournalEntries,
   demoMessagesBySession,
   demoNotificationSettings,
   demoNotifications,
+  demoPrivacySettings,
   demoProfile,
   demoUser,
 } from '@/src/lib/demo-data';
@@ -21,12 +23,15 @@ import type {
   ContactRecord,
   DailyCheckin,
   JournalEntry,
+  MedicalId,
   MoodValue,
   NotificationItem,
   NotificationSettings,
   OnboardingFormValues,
+  PrivacySettings,
   Profile,
   SessionUser,
+  CycleProfile,
 } from '@/src/types/domain';
 
 const uuidPattern =
@@ -48,6 +53,8 @@ const createRuntimeData = (isMockRuntime: boolean) => ({
   trustedContacts: isMockRuntime
     ? demoContacts.filter((contact) => contact.relationship !== 'Clinician')
     : [],
+  privacySettings: isMockRuntime ? demoPrivacySettings : { privateMode: false, hideNotificationPreviews: true },
+  cycleProfile: isMockRuntime ? demoCycleProfile : null,
 });
 
 type RuntimeData = ReturnType<typeof createRuntimeData>;
@@ -56,7 +63,10 @@ type AppState = RuntimeData & {
   hydrated: boolean;
   pendingVerificationEmail: string;
   onboardingDraft: Partial<OnboardingFormValues>;
+  medicalId: MedicalId | null;
   notificationSettings: NotificationSettings;
+  privacySettings: PrivacySettings;
+  cycleProfile: CycleProfile | null;
   setHydrated: () => void;
   setSession: (session: SessionUser | null) => void;
   hydrateLiveSession: (session: SessionUser, profile: Profile | null) => void;
@@ -70,18 +80,24 @@ type AppState = RuntimeData & {
   addChatMessage: (sessionId: string, message: ChatMessage) => void;
   markNotificationRead: (id: string) => void;
   updateNotificationSettings: (settings: Partial<NotificationSettings>) => void;
+  updatePrivacySettings: (settings: Partial<PrivacySettings>) => void;
   upsertTrustedContact: (contact: ContactRecord) => void;
   upsertClinicianContact: (contact: ContactRecord) => void;
+  setMedicalId: (medicalId: MedicalId | null) => void;
+  setCycleProfile: (cycleProfile: CycleProfile | null) => void;
 };
 
 const runtimeDefaults = createRuntimeData(env.isMock);
 
 const createState: StateCreator<AppState> = (set) => ({
+  ...runtimeDefaults,
   hydrated: false,
   pendingVerificationEmail: '',
   onboardingDraft: {},
+  medicalId: null,
   notificationSettings: demoNotificationSettings,
-  ...runtimeDefaults,
+  privacySettings: runtimeDefaults.privacySettings,
+  cycleProfile: runtimeDefaults.cycleProfile,
   setHydrated: () => set({ hydrated: true }),
   setSession: (session: SessionUser | null) => set({ session }),
   hydrateLiveSession: (session: SessionUser, profile: Profile | null) => set({ session, profile }),
@@ -98,8 +114,11 @@ const createState: StateCreator<AppState> = (set) => ({
       ...createRuntimeData(false),
       session: null,
       profile: null,
+      medicalId: null,
+      cycleProfile: null,
       pendingVerificationEmail: '',
       onboardingDraft: {},
+      privacySettings: { privateMode: false, hideNotificationPreviews: true },
     }),
   completeOnboarding: (values: OnboardingFormValues) =>
     set((state) => ({
@@ -122,6 +141,8 @@ const createState: StateCreator<AppState> = (set) => ({
             birthYear: values.birthYear,
             genderIdentity: values.genderIdentity,
             preferredVoice: values.preferredVoice,
+            avatarTheme: state.profile?.avatarTheme ?? 'mint',
+            avatarUrl: state.profile?.avatarUrl,
             medications: values.medicationsEnabled
               ? values.medicationsText
                   .split(',')
@@ -148,6 +169,15 @@ const createState: StateCreator<AppState> = (set) => ({
         ...state.notificationSettings,
         enabled: values.notificationsEnabled,
       },
+      cycleProfile: values.menstrualSupportEnabled
+        ? state.cycleProfile ?? {
+            enabled: true,
+            cycleLengthDays: 28,
+            periodLengthDays: 5,
+            irregularCycles: false,
+            symptoms: [],
+          }
+        : null,
     })),
   addCheckin: (checkin: DailyCheckin) => set((state) => ({ checkins: [checkin, ...state.checkins] })),
   addJournalEntry: (entry: JournalEntry) =>
@@ -171,6 +201,10 @@ const createState: StateCreator<AppState> = (set) => ({
     set((state) => ({
       notificationSettings: { ...state.notificationSettings, ...settings },
     })),
+  updatePrivacySettings: (settings: Partial<PrivacySettings>) =>
+    set((state) => ({
+      privacySettings: { ...state.privacySettings, ...settings },
+    })),
   upsertTrustedContact: (contact: ContactRecord) =>
     set((state) => ({
       trustedContacts: [contact, ...state.trustedContacts.filter((item) => item.id !== contact.id)],
@@ -182,19 +216,24 @@ const createState: StateCreator<AppState> = (set) => ({
         ...state.clinicianContacts.filter((item) => item.id !== contact.id),
       ],
     })),
+  setMedicalId: (medicalId: MedicalId | null) => set({ medicalId }),
+  setCycleProfile: (cycleProfile: CycleProfile | null) => set({ cycleProfile }),
 });
 
 export const useAppStore = create<AppState>()(
   persist(createState, {
     name: 'bubbleai-store',
-    version: 2,
+    version: 3,
     storage: createJSONStorage(() => secureStoreStorage),
     partialize: (state) => ({
       session: state.session,
       pendingVerificationEmail: state.pendingVerificationEmail,
       onboardingDraft: state.onboardingDraft,
       profile: state.profile,
+      medicalId: state.medicalId,
       notificationSettings: state.notificationSettings,
+      privacySettings: state.privacySettings,
+      cycleProfile: state.cycleProfile,
       clinicianContacts: state.clinicianContacts,
       trustedContacts: state.trustedContacts,
     }),
@@ -206,12 +245,20 @@ export const useAppStore = create<AppState>()(
           ...state,
           session: null,
           profile: null,
+          medicalId: null,
           clinicianContacts: [],
           trustedContacts: [],
         };
       }
 
-      return state;
+      return {
+        ...state,
+        privacySettings: state.privacySettings ?? {
+          privateMode: false,
+          hideNotificationPreviews: true,
+        },
+        cycleProfile: state.cycleProfile ?? null,
+      };
     },
     onRehydrateStorage: () => (state) => {
       if (!env.isMock && state?.session && !isUuid(state.session.id)) {

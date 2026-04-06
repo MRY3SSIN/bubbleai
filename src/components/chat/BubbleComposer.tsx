@@ -8,16 +8,33 @@ type BubbleComposerProps = {
   placeholder?: string;
   onSubmit: (value: string) => void;
   onVoicePress?: () => void;
+  onTypingChange?: (isTyping: boolean) => void;
+  disabled?: boolean;
 };
 
 export const BubbleComposer = ({
   placeholder = 'Start chatting with AI...',
   onSubmit,
   onVoicePress,
+  onTypingChange,
+  disabled = false,
 }: BubbleComposerProps) => {
   const [value, setValue] = useState('');
   const { width } = useWindowDimensions();
   const isCompact = width < 380;
+  const resolvedPlaceholder = isCompact ? 'Start chatting...' : placeholder;
+  const hasValue = value.trim().length > 0;
+
+  const submit = () => {
+    if (!hasValue || disabled) {
+      return;
+    }
+
+    const nextValue = value.trim();
+    onSubmit(nextValue);
+    setValue('');
+    onTypingChange?.(false);
+  };
 
   return (
     <View style={[styles.row, isCompact && styles.rowCompact]}>
@@ -26,21 +43,24 @@ export const BubbleComposer = ({
       </Pressable>
       <View style={[styles.inputWrap, isCompact && styles.inputWrapCompact]}>
         <TextInput
-          onChangeText={setValue}
-          onSubmitEditing={() => {
-            if (value.trim()) {
-              onSubmit(value.trim());
-              setValue('');
-            }
+          editable={!disabled}
+          onChangeText={(nextValue) => {
+            setValue(nextValue);
+            onTypingChange?.(nextValue.trim().length > 0);
           }}
-          placeholder={placeholder}
+          onSubmitEditing={submit}
+          placeholder={resolvedPlaceholder}
           placeholderTextColor={colors.inkMuted}
           style={[styles.input, isCompact && styles.inputCompact]}
           value={value}
         />
       </View>
-      <Pressable onPress={onVoicePress} style={[styles.voice, isCompact && styles.voiceCompact]}>
-        <Feather color={colors.white} name="mic" size={18} />
+      <Pressable
+        disabled={disabled}
+        onPress={hasValue ? submit : onVoicePress}
+        style={[styles.voice, isCompact && styles.voiceCompact, disabled && styles.voiceDisabled]}
+      >
+        <Feather color={colors.white} name={hasValue ? 'arrow-up' : 'mic'} size={18} />
       </Pressable>
     </View>
   );
@@ -93,5 +113,8 @@ const styles = StyleSheet.create({
   voiceCompact: {
     height: 48,
     width: 48,
+  },
+  voiceDisabled: {
+    opacity: 0.6,
   },
 });

@@ -63,7 +63,7 @@ export default function OnboardingWellnessScreen() {
           onPress={() => setMenstrualSupportEnabled((current) => !current)}
         />
       </View>
-      <PillButton label="Continue" onPress={goNext} />
+      <PillButton label="Continue" onPress={goNext} style={styles.cta} />
     </Screen>
   );
 }
@@ -85,5 +85,8 @@ const styles = StyleSheet.create({
   sectionTitle: {
     color: colors.ink,
     ...typography.h3,
+  },
+  cta: {
+    marginTop: spacing.xxxl,
   },
 });

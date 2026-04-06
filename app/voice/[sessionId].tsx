@@ -1,38 +1,132 @@
-import { useLocalSearchParams } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  RecordingPresets,
+  requestRecordingPermissionsAsync,
+  setAudioModeAsync,
+  useAudioRecorder,
+  useAudioRecorderState,
+} from 'expo-audio';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useMemo, useState } from 'react';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { AppCard } from '@/src/components/AppCard';
 import { BackHeader } from '@/src/components/layout/BackHeader';
 import { Screen } from '@/src/components/layout/Screen';
-import { useVoicePreview } from '@/src/features/voice/use-voice';
+import { PillButton } from '@/src/components/PillButton';
+import { useSendVoiceMessage } from '@/src/features/voice/use-voice';
 import { colors, radii, spacing, typography } from '@/src/theme';
 import type { VoiceState } from '@/src/types/domain';
 
-export default function VoiceSessionScreen() {
-  const { sessionId } = useLocalSearchParams<{ sessionId: string }>();
-  const { data: transcriptPreview } = useVoicePreview();
-  const [voiceState, setVoiceState] = useState<VoiceState>('idle');
-  const [lineIndex, setLineIndex] = useState(0);
+const formatDuration = (durationMillis: number) => {
+  const totalSeconds = Math.max(0, Math.floor(durationMillis / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+};
 
-  useEffect(() => {
-    if (voiceState !== 'speaking' || !transcriptPreview?.length) {
-      return;
+export default function VoiceSessionScreen() {
+  const router = useRouter();
+  const { sessionId } = useLocalSearchParams<{ sessionId: string }>();
+  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  const recorderState = useAudioRecorderState(recorder, 120);
+  const sendVoiceMessage = useSendVoiceMessage(sessionId);
+  const [voiceState, setVoiceState] = useState<VoiceState>('idle');
+  const [transcript, setTranscript] = useState('Tap the mic to start a calmer voice check-in.');
+  const [assistantText, setAssistantText] = useState(
+    'BubbleAI will turn your voice into a gentle reply in this same conversation.',
+  );
+
+  const isBusy = voiceState === 'processing' || sendVoiceMessage.isPending;
+  const statusLabel = useMemo(() => {
+    if (voiceState === 'listening') {
+      return `Listening • ${formatDuration(recorderState.durationMillis)}`;
     }
 
-    const interval = setInterval(() => {
-      setLineIndex((current) => (current + 1) % transcriptPreview.length);
-    }, 1800);
+    if (voiceState === 'processing') {
+      return 'Processing your voice check-in';
+    }
 
-    return () => clearInterval(interval);
-  }, [transcriptPreview, voiceState]);
+    if (voiceState === 'speaking') {
+      return 'Response ready';
+    }
 
-  const transcript = transcriptPreview?.[lineIndex] ?? 'Tap the mic to start a calmer voice check-in.';
+    if (voiceState === 'error') {
+      return 'Something interrupted the voice check-in';
+    }
+
+    return 'Ready when you are';
+  }, [recorderState.durationMillis, voiceState]);
+
+  const startRecording = async () => {
+    try {
+      const permission = await requestRecordingPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert('Microphone needed', 'Please allow microphone access to use voice check-ins.');
+        return;
+      }
+
+      await setAudioModeAsync({
+        allowsRecording: true,
+        playsInSilentMode: true,
+        shouldPlayInBackground: false,
+        shouldRouteThroughEarpiece: false,
+        interruptionMode: 'mixWithOthers',
+        interruptionModeAndroid: 'duckOthers',
+      });
+
+      await recorder.prepareToRecordAsync();
+      recorder.record();
+      setTranscript('Listening now. Speak at your own pace.');
+      setAssistantText('BubbleAI will answer as soon as you stop recording.');
+      setVoiceState('listening');
+    } catch (error) {
+      setVoiceState('error');
+      Alert.alert(
+        'Unable to start voice',
+        error instanceof Error ? error.message : 'Try again in a moment.',
+      );
+    }
+  };
+
+  const stopRecording = async () => {
+    try {
+      setVoiceState('processing');
+      await recorder.stop();
+      const audioUri = recorder.uri ?? recorderState.url;
+
+      if (!audioUri) {
+        throw new Error('No recording was captured yet.');
+      }
+
+      const result = await sendVoiceMessage.mutateAsync(audioUri);
+      setTranscript(result.transcript || 'BubbleAI could not hear that clearly. Try one more time.');
+      setAssistantText(result.assistantText || 'BubbleAI is here with you. Try sending one more note.');
+      setVoiceState('speaking');
+    } catch (error) {
+      setVoiceState('error');
+      Alert.alert(
+        'Voice check-in failed',
+        error instanceof Error ? error.message : 'Please try again.',
+      );
+    } finally {
+      await setAudioModeAsync({
+        allowsRecording: false,
+        playsInSilentMode: true,
+        shouldPlayInBackground: false,
+        shouldRouteThroughEarpiece: false,
+        interruptionMode: 'mixWithOthers',
+        interruptionModeAndroid: 'duckOthers',
+      }).catch(() => undefined);
+    }
+  };
 
   return (
     <Screen scroll={false}>
       <BackHeader title={`Voice • ${sessionId?.slice(-4) ?? 'live'}`} />
       <View style={styles.content}>
-        <Text style={styles.transcript}>{transcript}</Text>
+        <Text style={styles.title}>Tap the mic to start a calmer voice check-in.</Text>
+        <Text style={styles.state}>{statusLabel}</Text>
+
         <View style={styles.rings}>
           {[220, 170, 120].map((size, index) => (
             <View
@@ -42,30 +136,44 @@ export default function VoiceSessionScreen() {
                 {
                   width: size,
                   height: size,
-                  opacity: 0.18 + index * 0.12,
+                  opacity: voiceState === 'listening' ? 0.2 + index * 0.14 : 0.12 + index * 0.1,
                 },
               ]}
             />
           ))}
           <Pressable
-            onPress={() =>
-              setVoiceState((current) =>
-                current === 'idle' || current === 'error' ? 'listening' : current === 'listening' ? 'speaking' : 'idle',
-              )
-            }
-            style={styles.mic}
+            disabled={isBusy}
+            onPress={voiceState === 'listening' ? stopRecording : startRecording}
+            style={[styles.mic, isBusy && styles.micDisabled]}
           >
-            <Text style={styles.micLabel}>🎙️</Text>
+            <Text style={styles.micLabel}>{voiceState === 'listening' ? 'Stop' : 'Mic'}</Text>
           </Pressable>
         </View>
-        <Text style={styles.state}>State: {voiceState}</Text>
+
+        <AppCard style={styles.card}>
+          <Text style={styles.cardEyebrow}>Your words</Text>
+          <Text style={styles.cardBody}>{transcript}</Text>
+        </AppCard>
+
+        <AppCard style={styles.card}>
+          <Text style={styles.cardEyebrow}>BubbleAI</Text>
+          <Text style={styles.cardBody}>{assistantText}</Text>
+        </AppCard>
+
         <View style={styles.controls}>
-          <Pressable onPress={() => setVoiceState('idle')} style={[styles.control, styles.controlDanger]}>
-            <Text style={styles.controlText}>End</Text>
-          </Pressable>
-          <Pressable onPress={() => setVoiceState('speaking')} style={[styles.control, styles.controlSuccess]}>
-            <Text style={styles.controlText}>Speak</Text>
-          </Pressable>
+          <PillButton
+            label="End"
+            onPress={() => router.back()}
+            style={styles.secondaryControl}
+            variant="secondary"
+          />
+          <PillButton
+            disabled={isBusy}
+            label={voiceState === 'listening' ? 'Send voice' : 'Speak'}
+            loading={isBusy}
+            onPress={voiceState === 'listening' ? stopRecording : startRecording}
+            style={styles.primaryControl}
+          />
         </View>
       </View>
     </Screen>
@@ -74,20 +182,26 @@ export default function VoiceSessionScreen() {
 
 const styles = StyleSheet.create({
   content: {
-    alignItems: 'center',
     flex: 1,
-    justifyContent: 'space-between',
     paddingBottom: spacing.xxxl,
   },
-  transcript: {
+  title: {
     color: colors.ink,
-    marginTop: spacing.xxxl,
+    marginTop: spacing.xl,
     textAlign: 'center',
     ...typography.h2,
+  },
+  state: {
+    color: colors.inkMuted,
+    marginTop: spacing.md,
+    textAlign: 'center',
+    ...typography.body,
   },
   rings: {
     alignItems: 'center',
     justifyContent: 'center',
+    marginVertical: spacing.xxxl,
+    minHeight: 240,
     position: 'relative',
   },
   ring: {
@@ -99,37 +213,38 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: colors.mint,
     borderRadius: radii.pill,
-    height: 92,
+    height: 104,
     justifyContent: 'center',
-    width: 92,
+    width: 104,
+  },
+  micDisabled: {
+    opacity: 0.75,
   },
   micLabel: {
-    fontSize: 36,
+    color: colors.white,
+    ...typography.h3,
   },
-  state: {
-    color: colors.inkMuted,
+  card: {
+    marginBottom: spacing.md,
+  },
+  cardEyebrow: {
+    color: colors.mint,
+    marginBottom: spacing.xs,
+    ...typography.label,
+  },
+  cardBody: {
+    color: colors.ink,
     ...typography.body,
   },
   controls: {
     flexDirection: 'row',
-    gap: spacing.xxxl,
+    gap: spacing.md,
+    marginTop: spacing.lg,
   },
-  control: {
-    alignItems: 'center',
-    borderRadius: radii.pill,
-    height: 54,
-    justifyContent: 'center',
-    width: 92,
+  secondaryControl: {
+    flex: 1,
   },
-  controlDanger: {
-    backgroundColor: '#FFE5E5',
-  },
-  controlSuccess: {
-    backgroundColor: '#E3F7E8',
-  },
-  controlText: {
-    color: colors.ink,
-    ...typography.label,
+  primaryControl: {
+    flex: 1.4,
   },
 });
-

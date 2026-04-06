@@ -8,12 +8,15 @@ import { SettingsRow } from '@/src/components/layout/SettingsRow';
 import { Screen } from '@/src/components/layout/Screen';
 import { authService } from '@/src/lib/auth';
 import { useAppStore } from '@/src/lib/app-store';
+import { getCycleInsight } from '@/src/lib/cycle-support';
 import { colors, spacing, typography } from '@/src/theme';
 
 export default function ProfileScreen() {
   const router = useRouter();
   const profile = useAppStore((state) => state.profile);
   const trustedContacts = useAppStore((state) => state.trustedContacts);
+  const cycleProfile = useAppStore((state) => state.cycleProfile);
+  const cycleInsight = getCycleInsight(cycleProfile);
 
   if (!profile) {
     return null;
@@ -22,16 +25,43 @@ export default function ProfileScreen() {
   return (
     <Screen>
       <View style={styles.top}>
-        <Avatar name={profile.fullName} size={92} />
+        <Avatar
+          name={profile.fullName}
+          size={92}
+          theme={profile.avatarTheme}
+          uri={profile.avatarUrl}
+        />
         <Text style={styles.name}>{profile.fullName}</Text>
         <Text style={styles.badge}>Bubble+</Text>
       </View>
 
       <Text style={styles.sectionTitle}>Personal details</Text>
       <View style={styles.stack}>
-        <SettingsRow title="Health details" subtitle="Voice, symptoms, routines, and wellness support." onPress={() => router.push('/settings')} />
-        <SettingsRow title="Medical ID" subtitle="Clinician details and support notes." onPress={() => router.push('/settings')} />
-        <SettingsRow title="Emergency contact" subtitle={trustedContacts[0]?.name ?? 'Add someone you trust.'} onPress={() => router.push('/settings')} />
+        <SettingsRow
+          title="Edit profile"
+          subtitle="Photo, name, voice, symptoms, and habits."
+          onPress={() => router.push('/settings/profile')}
+        />
+        <SettingsRow
+          title="Medical ID"
+          subtitle="Clinician details, allergies, and support notes."
+          onPress={() => router.push('/settings/medical-id')}
+        />
+        <SettingsRow
+          title="Emergency contacts"
+          subtitle={trustedContacts[0]?.name ?? 'Add someone you trust.'}
+          onPress={() => router.push('/settings/emergency-contacts')}
+        />
+        <SettingsRow
+          title="Cycle-aware support"
+          subtitle={
+            cycleInsight?.title ??
+            (profile.menstrualSupportEnabled
+              ? 'Cycle support is on and ready to personalize.'
+              : 'Optional menstrual wellness support.')
+          }
+          onPress={() => router.push('/settings/cycle-support')}
+        />
       </View>
 
       <Text style={styles.sectionTitle}>Trusted support</Text>

@@ -1,4 +1,4 @@
-import { ActivityIndicator, Pressable, StyleSheet, Text } from 'react-native';
+import { ActivityIndicator, Pressable, StyleProp, StyleSheet, Text, TextStyle, ViewStyle } from 'react-native';
 
 import { colors, radii, spacing, typography } from '@/src/theme';
 
@@ -8,6 +8,8 @@ type PillButtonProps = {
   variant?: 'primary' | 'secondary' | 'ghost' | 'danger';
   disabled?: boolean;
   loading?: boolean;
+  style?: StyleProp<ViewStyle>;
+  labelStyle?: StyleProp<TextStyle>;
 };
 
 export const PillButton = ({
@@ -16,6 +18,8 @@ export const PillButton = ({
   variant = 'primary',
   disabled,
   loading,
+  style,
+  labelStyle,
 }: PillButtonProps) => (
   <Pressable
     accessibilityRole="button"
@@ -24,6 +28,7 @@ export const PillButton = ({
     style={({ pressed }) => [
       styles.base,
       variantStyles[variant].container,
+      style,
       pressed && !disabled && styles.pressed,
       disabled && styles.disabled,
     ]}
@@ -31,7 +36,7 @@ export const PillButton = ({
     {loading ? (
       <ActivityIndicator color={variantStyles[variant].label.color} />
     ) : (
-      <Text style={[styles.label, variantStyles[variant].label]}>{label}</Text>
+      <Text style={[styles.label, variantStyles[variant].label, labelStyle]}>{label}</Text>
     )}
   </Pressable>
 );
@@ -91,4 +96,3 @@ const variantStyles = {
     },
   }),
 };
-

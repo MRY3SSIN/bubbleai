@@ -5,7 +5,12 @@ import {
   loadConversationContext,
 } from '../_shared/chat-context.ts';
 import { assertServerEnv, serverEnv } from '../_shared/env.ts';
-import { createModeration, createResponse, extractResponseText } from '../_shared/openai.ts';
+import {
+  createModeration,
+  createResponse,
+  createTranscription,
+  extractResponseText,
+} from '../_shared/openai.ts';
 import { bubbleSafetyDeveloperPrompt, bubbleSystemPrompt } from '../_shared/prompts.ts';
 import { createServiceClient, getUserFromRequest } from '../_shared/supabase.ts';
 import { detectRiskLevel, fallbackSafetyResponse } from '../_shared/safety.ts';
@@ -19,21 +24,40 @@ Deno.serve(async (request) => {
     assertServerEnv();
     const user = await getUserFromRequest(request);
     const supabase = createServiceClient();
-    const { sessionId, message, mode = 'text', clientContext = null } = await request.json();
+    const formData = await request.formData();
+    const sessionId = String(formData.get('sessionId') ?? '');
+    const audio = formData.get('audio');
+    const clientContextRaw = String(formData.get('clientContext') ?? '');
+    const clientContext = clientContextRaw ? JSON.parse(clientContextRaw) : null;
 
-    const moderation = await createModeration(message);
-    const heuristicRisk = detectRiskLevel(message);
+    if (!(audio instanceof File)) {
+      throw new Error('No audio file was sent.');
+    }
+
+    if (!sessionId) {
+      throw new Error('Missing conversation session.');
+    }
+
+    const transcription = await createTranscription(audio);
+    const transcript = typeof transcription.text === 'string' ? transcription.text.trim() : '';
+
+    if (!transcript) {
+      throw new Error('BubbleAI could not hear that clearly enough yet.');
+    }
+
+    const moderation = await createModeration(transcript);
+    const heuristicRisk = detectRiskLevel(transcript);
     const context = await loadConversationContext(supabase, user.id, sessionId);
 
     const safetyOverride = heuristicRisk === 'red' || heuristicRisk === 'yellow';
 
     const aiResponse = safetyOverride
-      ? { output_text: fallbackSafetyResponse(heuristicRisk, message) }
+      ? { output_text: fallbackSafetyResponse(heuristicRisk, transcript) }
       : await createResponse({
           model: serverEnv.openAiTextModel,
           temperature: 0.8,
           instructions: buildAssistantInstructions({
-            mode,
+            mode: 'voice',
             clientContext,
             context,
             systemPrompt: bubbleSystemPrompt,
@@ -41,20 +65,21 @@ Deno.serve(async (request) => {
           }),
           input:
             `Conversation so far:\n${formatConversationHistory(context.priorMessages)}\n\n` +
-            `Latest user message:\n${message}\n\n` +
-            'Reply as BubbleAI in plain text only.',
+            `Latest voice transcript:\n${transcript}\n\n` +
+            'Reply as BubbleAI in plain text only. Keep it especially easy to hear out loud.',
         });
 
-    const assistantText = extractResponseText(aiResponse) || fallbackSafetyResponse(heuristicRisk, message);
+    const assistantText = extractResponseText(aiResponse) || fallbackSafetyResponse(heuristicRisk, transcript);
 
     await supabase.from('chat_messages').insert([
       {
         session_id: sessionId,
         user_id: user.id,
         role: 'user',
-        content: message,
+        content: transcript,
         moderation,
         risk_level: heuristicRisk,
+        metadata: { source: 'voice', audio_name: audio.name },
       },
       {
         session_id: sessionId,
@@ -64,6 +89,7 @@ Deno.serve(async (request) => {
         moderation: {},
         risk_level: heuristicRisk,
         response_id: typeof aiResponse.id === 'string' ? aiResponse.id : null,
+        metadata: { source: 'voice' },
       },
     ]);
 
@@ -78,6 +104,7 @@ Deno.serve(async (request) => {
 
     return Response.json(
       {
+        transcript,
         risk_level: heuristicRisk,
         assistant_text: assistantText,
       },

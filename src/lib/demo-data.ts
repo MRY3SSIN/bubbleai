@@ -16,11 +16,13 @@ import type {
   InsightCard,
   NotificationItem,
   NotificationSettings,
+  PrivacySettings,
   Profile,
   Recommendation,
   SessionUser,
   TrendPoint,
   JournalEntry,
+  CycleProfile,
 } from '@/src/types/domain';
 
 const trend = (values: number[], labels: string[]): TrendPoint[] =>
@@ -70,6 +72,24 @@ export const demoNotificationSettings: NotificationSettings = {
   movement: false,
   quietHoursStart: '22:00',
   quietHoursEnd: '07:00',
+};
+
+export const demoPrivacySettings: PrivacySettings = {
+  privateMode: false,
+  hideNotificationPreviews: true,
+};
+
+export const demoCycleProfile: CycleProfile = {
+  enabled: true,
+  lastPeriodStart: formatISO(subDays(new Date(), 10), { representation: 'date' }),
+  cycleLengthDays: 28,
+  periodLengthDays: 5,
+  irregularCycles: false,
+  symptoms: ['Cramps', 'Low energy', 'Tenderness'],
+  notes: 'Gentler mornings and extra water help most during the week before my period.',
+  currentPhase: 'follicular',
+  cycleDay: 11,
+  nextPeriodInDays: 18,
 };
 
 export const demoCheckins: DailyCheckin[] = Array.from({ length: 8 }).map((_, index) => ({

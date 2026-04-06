@@ -1,14 +1,24 @@
 import { Image, StyleSheet, Text, View } from 'react-native';
 
+import type { AvatarTheme } from '@/src/types/domain';
 import { colors, typography } from '@/src/theme';
 
 type AvatarProps = {
   name: string;
   size?: number;
   uri?: string;
+  theme?: AvatarTheme;
 };
 
-export const Avatar = ({ name, size = 52, uri }: AvatarProps) => {
+const avatarThemes: Record<AvatarTheme, string> = {
+  mint: colors.cardStrong,
+  ocean: '#D9EDF9',
+  sunrise: '#FCE8D8',
+  lavender: '#ECE7FB',
+  forest: '#DDEDE6',
+};
+
+export const Avatar = ({ name, size = 52, uri, theme = 'mint' }: AvatarProps) => {
   const initials = name
     .split(' ')
     .slice(0, 2)
@@ -20,7 +30,17 @@ export const Avatar = ({ name, size = 52, uri }: AvatarProps) => {
   }
 
   return (
-    <View style={[styles.fallback, { width: size, height: size, borderRadius: size / 2 }]}>
+    <View
+      style={[
+        styles.fallback,
+        {
+          width: size,
+          height: size,
+          borderRadius: size / 2,
+          backgroundColor: avatarThemes[theme],
+        },
+      ]}
+    >
       <Text style={styles.initials}>{initials}</Text>
     </View>
   );
@@ -29,7 +49,6 @@ export const Avatar = ({ name, size = 52, uri }: AvatarProps) => {
 const styles = StyleSheet.create({
   fallback: {
     alignItems: 'center',
-    backgroundColor: colors.cardStrong,
     borderColor: colors.white,
     borderWidth: 2,
     justifyContent: 'center',
@@ -39,4 +58,3 @@ const styles = StyleSheet.create({
     ...typography.label,
   },
 });
-

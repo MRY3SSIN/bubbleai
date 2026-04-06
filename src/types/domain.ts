@@ -4,6 +4,8 @@ export type RiskLevel = 'green' | 'yellow' | 'red';
 export type ChatMode = 'text' | 'voice';
 export type VoicePreset = 'feminine' | 'masculine' | 'neutral_calm';
 export type InsightPeriod = 'week' | 'month' | '6_month' | 'year';
+export type AvatarTheme = 'mint' | 'ocean' | 'sunrise' | 'lavender' | 'forest';
+export type CyclePhase = 'menstrual' | 'follicular' | 'ovulation' | 'luteal';
 export type RecommendationKind =
   | 'hydration'
   | 'walk'
@@ -23,6 +25,7 @@ export type SessionUser = {
   fullName: string;
   displayName: string;
   avatarUrl?: string;
+  avatarTheme?: AvatarTheme;
   onboardingComplete: boolean;
 };
 
@@ -35,6 +38,8 @@ export type Profile = {
   birthYear?: number;
   genderIdentity?: string;
   preferredVoice: VoicePreset;
+  avatarUrl?: string;
+  avatarTheme?: AvatarTheme;
   medications?: string[];
   diagnoses?: string[];
   smokingHabits?: string;
@@ -74,6 +79,24 @@ export type NotificationSettings = {
   movement: boolean;
   quietHoursStart: string;
   quietHoursEnd: string;
+};
+
+export type PrivacySettings = {
+  privateMode: boolean;
+  hideNotificationPreviews: boolean;
+};
+
+export type CycleProfile = {
+  enabled: boolean;
+  lastPeriodStart?: string;
+  cycleLengthDays: number;
+  periodLengthDays: number;
+  irregularCycles: boolean;
+  symptoms: string[];
+  notes?: string;
+  currentPhase?: CyclePhase;
+  cycleDay?: number;
+  nextPeriodInDays?: number;
 };
 
 export type BubbleScoreBreakdown = {
@@ -175,6 +198,19 @@ export type ContactRecord = {
   phone?: string;
   email?: string;
   isFavorite?: boolean;
+  notes?: string;
+};
+
+export type MedicalId = {
+  bloodType?: string;
+  allergies?: string;
+  conditions?: string;
+  medications?: string;
+  notes?: string;
+  clinicianName?: string;
+  clinicianPhone?: string;
+  clinicianAddress?: string;
+  clinicianMapsUrl?: string;
 };
 
 export type Recommendation = {

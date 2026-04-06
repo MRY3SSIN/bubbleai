@@ -4,13 +4,14 @@ import { StyleSheet, Switch, Text, View } from 'react-native';
 import { AppCard } from '@/src/components/AppCard';
 import { SectionHeader } from '@/src/components/layout/SectionHeader';
 import { Screen } from '@/src/components/layout/Screen';
-import { useNotificationSettings } from '@/src/features/profile/use-profile';
+import { useNotificationSettings, usePrivacySettings } from '@/src/features/profile/use-profile';
 import { dataService } from '@/src/lib/data-service';
 import { useQuery } from '@tanstack/react-query';
 import { colors, spacing, typography } from '@/src/theme';
 
 export default function NotificationsScreen() {
   const { data: settings } = useNotificationSettings();
+  const { data: privacySettings } = usePrivacySettings();
   const { data: notifications } = useQuery({
     queryKey: ['notifications'],
     queryFn: () => dataService.listNotifications(),
@@ -52,6 +53,15 @@ export default function NotificationsScreen() {
           : null}
       </View>
 
+      {privacySettings?.hideNotificationPreviews ? (
+        <AppCard style={styles.privacyCard}>
+          <Text style={styles.itemTitle}>Privacy is filtering previews</Text>
+          <Text style={styles.body}>
+            Notification messages stay hidden in the in-app list while preview privacy is turned on.
+          </Text>
+        </AppCard>
+      ) : null}
+
       <SectionHeader title="In-app list" />
       <View style={styles.stack}>
         {notifications?.map((item) => (
@@ -91,5 +101,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
     ...typography.caption,
   },
+  privacyCard: {
+    marginBottom: spacing.xl,
+  },
 });
-

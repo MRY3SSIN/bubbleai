@@ -50,3 +50,53 @@ export const createResponse = async (payload: Record<string, unknown>) => {
   return response.json();
 };
 
+export const extractResponseText = (response: Record<string, unknown>) => {
+  if (typeof response.output_text === 'string' && response.output_text.trim().length > 0) {
+    return response.output_text.trim();
+  }
+
+  const output = Array.isArray(response.output) ? response.output : [];
+  const chunks = output.flatMap((item) => {
+    const content =
+      item && typeof item === 'object' && Array.isArray((item as { content?: unknown[] }).content)
+        ? ((item as { content: Array<Record<string, unknown>> }).content ?? [])
+        : [];
+
+    return content
+      .map((part) => {
+        if (typeof part.text === 'string') {
+          return part.text;
+        }
+
+        const nestedText = part?.text;
+        if (nestedText && typeof nestedText === 'object' && typeof nestedText.value === 'string') {
+          return nestedText.value;
+        }
+
+        return '';
+      })
+      .filter(Boolean);
+  });
+
+  return chunks.join('\n\n').trim();
+};
+
+export const createTranscription = async (audioFile: File) => {
+  const formData = new FormData();
+  formData.append('model', serverEnv.openAiTranscriptionModel);
+  formData.append('file', audioFile, audioFile.name || 'voice-note.m4a');
+
+  const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${serverEnv.openAiApiKey}`,
+    },
+    body: formData,
+  });
+
+  if (!response.ok) {
+    throw new Error(`Transcription request failed: ${await response.text()}`);
+  }
+
+  return response.json();
+};

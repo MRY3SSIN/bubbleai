@@ -7,7 +7,6 @@ import { BubbleComposer } from '@/src/components/chat/BubbleComposer';
 import { BackHeader } from '@/src/components/layout/BackHeader';
 import { Screen } from '@/src/components/layout/Screen';
 import { useCreateChatSession } from '@/src/features/chat/use-chat';
-import { dataService } from '@/src/lib/data-service';
 import { colors, radii, spacing, typography } from '@/src/theme';
 
 const suggestions = ['I feel overwhelmed', 'Help me settle tonight', 'Give me a tiny routine'];
@@ -21,8 +20,12 @@ export default function NewChatScreen() {
     try {
       setSending(true);
       const session = await createSession.mutateAsync({ mode: 'text', title: content.slice(0, 28) });
-      await dataService.sendChatMessage(session.id, content);
-      router.replace(`/chat/${session.id}` as never);
+      router.replace(
+        {
+          pathname: '/chat/[sessionId]',
+          params: { sessionId: session.id, initialMessage: content },
+        } as never,
+      );
     } catch (error) {
       Alert.alert('Unable to start chat', error instanceof Error ? error.message : 'Try again.');
     } finally {
@@ -45,10 +48,18 @@ export default function NewChatScreen() {
           </Text>
         ))}
       </View>
-      <BubbleComposer onSubmit={startChat} onVoicePress={async () => {
-        const session = await createSession.mutateAsync({ mode: 'voice', title: 'Live voice chat' });
-        router.push(`/voice/${session.id}` as never);
-      }} />
+      <BubbleComposer
+        disabled={sending}
+        onSubmit={startChat}
+        onVoicePress={async () => {
+          try {
+            const session = await createSession.mutateAsync({ mode: 'voice', title: 'Live voice chat' });
+            router.push(`/voice/${session.id}` as never);
+          } catch (error) {
+            Alert.alert('Unable to start voice', error instanceof Error ? error.message : 'Try again.');
+          }
+        }}
+      />
       {sending ? <Text style={styles.sending}>BubbleAI is warming up your conversation...</Text> : null}
     </Screen>
   );

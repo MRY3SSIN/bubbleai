@@ -18,5 +18,10 @@ export const useVerifyCode = () =>
       context: 'signup' | 'forgot';
     }) => authService.verifyCode(email, code, context),
   });
+export const useResendCode = () =>
+  useMutation({
+    mutationFn: ({ email, context }: { email: string; context: 'signup' | 'forgot' }) =>
+      authService.resendCode(email, context),
+  });
 export const useResetPassword = () =>
   useMutation({ mutationFn: ({ password }: { password: string }) => authService.resetPassword(password) });

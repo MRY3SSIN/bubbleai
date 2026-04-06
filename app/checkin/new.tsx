@@ -34,6 +34,7 @@ export default function NewCheckinScreen() {
       </View>
       <PillButton
         label="Save assessment"
+        style={styles.saveButton}
         onPress={async () => {
           await dataService.saveCheckin({ mood, stress, energy, sleep, overwhelm, notes });
           Alert.alert('Saved', 'Your self analysis was added to BubbleAI.');
@@ -54,5 +55,8 @@ const styles = StyleSheet.create({
     gap: spacing.lg,
     marginTop: spacing.xl,
   },
+  saveButton: {
+    marginBottom: spacing.xl,
+    marginTop: spacing.xxxl,
+  },
 });
-

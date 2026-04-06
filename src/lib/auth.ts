@@ -69,6 +69,8 @@ const mapSessionUser = (
     profile?.displayName ??
     (user.user_metadata.display_name as string | undefined) ??
     ((user.user_metadata.full_name as string | undefined)?.split(' ')[0] ?? 'Friend'),
+  avatarUrl: profile?.avatarUrl,
+  avatarTheme: profile?.avatarTheme,
   onboardingComplete:
     Boolean(profile?.onboardingComplete) || Boolean(user.user_metadata.onboarding_complete),
 });
@@ -93,6 +95,8 @@ const fetchProfile = async (userId: string): Promise<Profile | null> => {
     birthYear: data.birth_year ?? undefined,
     genderIdentity: data.gender_identity ?? undefined,
     preferredVoice: data.preferred_voice,
+    avatarUrl: data.avatar_url ?? undefined,
+    avatarTheme: data.avatar_theme ?? 'mint',
     medications: [],
     diagnoses: [],
     smokingHabits: undefined,
@@ -144,6 +148,7 @@ export const authService = {
           full_name: credentials.fullName,
           display_name: credentials.fullName?.split(' ')[0],
         },
+        emailRedirectTo: 'bubbleai://auth',
       },
     });
 
@@ -183,16 +188,57 @@ export const authService = {
       return true;
     }
 
-    const { error } = await supabase.auth.verifyOtp({
+    const { data, error } = await supabase.auth.verifyOtp({
       email,
       token: code,
-      type: context === 'signup' ? 'signup' : 'email',
+      type: 'email',
     });
 
     if (error) {
       throw error;
     }
 
+    if (data.user) {
+      const profile = await fetchProfile(data.user.id);
+      const sessionUser = mapSessionUser(data.user, email, profile);
+      useAppStore.getState().hydrateLiveSession(sessionUser, profile);
+    }
+
+    return true;
+  },
+
+  async resendCode(email: string, context: 'signup' | 'forgot' = 'signup') {
+    if (env.isMock || !supabase) {
+      useAppStore.getState().setPendingVerification(email);
+      return true;
+    }
+
+    if (context === 'signup') {
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email,
+        options: {
+          emailRedirectTo: 'bubbleai://auth',
+        },
+      });
+
+      if (error) {
+        throw mapAuthError(error);
+      }
+    } else {
+      const { error } = await supabase.auth.signInWithOtp({
+        email,
+        options: {
+          shouldCreateUser: false,
+        },
+      });
+
+      if (error) {
+        throw mapAuthError(error);
+      }
+    }
+
+    useAppStore.getState().setPendingVerification(email);
     return true;
   },
 
