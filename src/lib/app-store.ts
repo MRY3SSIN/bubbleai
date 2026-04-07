@@ -127,6 +127,7 @@ const createState: StateCreator<AppState> = (set) => ({
             ...state.session,
             fullName: values.fullName,
             displayName: values.displayName,
+            avatarPath: state.profile?.avatarPath,
             onboardingComplete: true,
           }
         : state.session,
@@ -141,6 +142,7 @@ const createState: StateCreator<AppState> = (set) => ({
             birthYear: values.birthYear,
             genderIdentity: values.genderIdentity,
             preferredVoice: values.preferredVoice,
+            avatarPath: state.profile?.avatarPath,
             avatarTheme: state.profile?.avatarTheme ?? 'mint',
             avatarUrl: state.profile?.avatarUrl,
             medications: values.medicationsEnabled

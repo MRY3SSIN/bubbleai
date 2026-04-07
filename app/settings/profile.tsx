@@ -40,6 +40,7 @@ type ProfileFormState = {
   birthYear: string;
   genderIdentity: string;
   preferredVoice: VoicePreset;
+  avatarPath?: string;
   avatarTheme: AvatarTheme;
   avatarUrl?: string;
   smokingHabits: string;
@@ -78,6 +79,7 @@ export default function ProfileSettingsScreen() {
       birthYear: profile.birthYear ? String(profile.birthYear) : '',
       genderIdentity: profile.genderIdentity ?? '',
       preferredVoice: profile.preferredVoice,
+      avatarPath: profile.avatarPath,
       avatarTheme: profile.avatarTheme ?? 'mint',
       avatarUrl: profile.avatarUrl,
       smokingHabits: profile.smokingHabits ?? 'None',
@@ -110,8 +112,9 @@ export default function ProfileSettingsScreen() {
         return;
       }
 
-      const avatarUrl = await dataService.uploadAvatar(result.assets[0].uri);
-      updateField('avatarUrl', avatarUrl);
+      const avatar = await dataService.uploadAvatar(result.assets[0].uri);
+      updateField('avatarPath', avatar.avatarPath);
+      updateField('avatarUrl', avatar.avatarUrl);
     } catch (error) {
       Alert.alert(
         'Unable to update photo',
@@ -129,6 +132,7 @@ export default function ProfileSettingsScreen() {
         birthYear: form.birthYear ? Number(form.birthYear) : undefined,
         genderIdentity: form.genderIdentity.trim() || undefined,
         preferredVoice: form.preferredVoice,
+        avatarPath: form.avatarPath,
         avatarTheme: form.avatarTheme,
         avatarUrl: form.avatarUrl,
         smokingHabits: form.smokingHabits,

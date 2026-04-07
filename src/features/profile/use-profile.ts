@@ -20,6 +20,7 @@ export const useUpdateProfile = () => {
       birthYear?: number;
       genderIdentity?: string;
       preferredVoice: Profile['preferredVoice'];
+      avatarPath?: string;
       avatarTheme?: Profile['avatarTheme'];
       avatarUrl?: string;
       smokingHabits?: string;

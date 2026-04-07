@@ -34,7 +34,7 @@ const trend = (values: number[], labels: string[]): TrendPoint[] =>
 
 export const demoUser: SessionUser = {
   id: 'user-demo',
-  email: 'simar@bubbleai.app',
+  email: 'simar@example.com',
   fullName: 'Simar Bhatia',
   displayName: 'Simar',
   onboardingComplete: true,

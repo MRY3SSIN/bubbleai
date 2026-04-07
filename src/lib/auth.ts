@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 
+import { avatarSignedUrlTtlSeconds, parseStoredAvatarValue } from '@/src/lib/avatar-storage';
 import { env } from '@/src/lib/env';
 import { secureStoreStorage } from '@/src/lib/secure-store';
 import { useAppStore } from '@/src/lib/app-store';
@@ -69,6 +70,7 @@ const mapSessionUser = (
     profile?.displayName ??
     (user.user_metadata.display_name as string | undefined) ??
     ((user.user_metadata.full_name as string | undefined)?.split(' ')[0] ?? 'Friend'),
+  avatarPath: profile?.avatarPath,
   avatarUrl: profile?.avatarUrl,
   avatarTheme: profile?.avatarTheme,
   onboardingComplete:
@@ -86,6 +88,16 @@ const fetchProfile = async (userId: string): Promise<Profile | null> => {
     return null;
   }
 
+  const storedAvatar = parseStoredAvatarValue(data.avatar_url ?? undefined);
+  const avatarUrl =
+    storedAvatar.avatarPath
+      ? (
+          await supabase.storage
+            .from('avatars')
+            .createSignedUrl(storedAvatar.avatarPath, avatarSignedUrlTtlSeconds)
+        ).data?.signedUrl ?? storedAvatar.directUrl
+      : storedAvatar.directUrl;
+
   return {
     id: data.id,
     email: data.email,
@@ -95,7 +107,8 @@ const fetchProfile = async (userId: string): Promise<Profile | null> => {
     birthYear: data.birth_year ?? undefined,
     genderIdentity: data.gender_identity ?? undefined,
     preferredVoice: data.preferred_voice,
-    avatarUrl: data.avatar_url ?? undefined,
+    avatarPath: storedAvatar.avatarPath,
+    avatarUrl,
     avatarTheme: data.avatar_theme ?? 'mint',
     medications: [],
     diagnoses: [],
@@ -148,7 +161,6 @@ export const authService = {
           full_name: credentials.fullName,
           display_name: credentials.fullName?.split(' ')[0],
         },
-        emailRedirectTo: 'bubbleai://auth',
       },
     });
 
@@ -217,9 +229,6 @@ export const authService = {
       const { error } = await supabase.auth.resend({
         type: 'signup',
         email,
-        options: {
-          emailRedirectTo: 'bubbleai://auth',
-        },
       });
 
       if (error) {

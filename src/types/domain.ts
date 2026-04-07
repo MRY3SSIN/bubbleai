@@ -24,6 +24,7 @@ export type SessionUser = {
   email: string;
   fullName: string;
   displayName: string;
+  avatarPath?: string;
   avatarUrl?: string;
   avatarTheme?: AvatarTheme;
   onboardingComplete: boolean;
@@ -38,6 +39,7 @@ export type Profile = {
   birthYear?: number;
   genderIdentity?: string;
   preferredVoice: VoicePreset;
+  avatarPath?: string;
   avatarUrl?: string;
   avatarTheme?: AvatarTheme;
   medications?: string[];

@@ -6,6 +6,7 @@ import { getCalendars, getLocales } from 'expo-localization';
 import * as Sharing from 'expo-sharing';
 
 import { authService, supabase } from '@/src/lib/auth';
+import { avatarSignedUrlTtlSeconds, parseStoredAvatarValue } from '@/src/lib/avatar-storage';
 import { calculateBubbleScore } from '@/src/lib/bubble-score';
 import { generateSessionTitle } from '@/src/lib/chat';
 import { getCycleInsight } from '@/src/lib/cycle-support';
@@ -259,42 +260,55 @@ const defaultCycleProfile: CycleProfile = {
   symptoms: [],
 };
 
-const mapProfileWithPreferences = (
+const mapProfileWithPreferences = async (
   profileRow: Record<string, unknown>,
   preferenceRow?: Record<string, unknown> | null,
-): Profile => ({
-  id: String(profileRow.id),
-  email: String(profileRow.email ?? ''),
-  fullName: String(profileRow.full_name ?? 'BubbleAI User'),
-  displayName: String(profileRow.display_name ?? 'Friend'),
-  pronouns: (profileRow.pronouns as string | null) ?? undefined,
-  birthYear: (profileRow.birth_year as number | null) ?? undefined,
-  genderIdentity: (profileRow.gender_identity as string | null) ?? undefined,
-  preferredVoice: (profileRow.preferred_voice as Profile['preferredVoice']) ?? 'neutral_calm',
-  avatarUrl: (profileRow.avatar_url as string | null) ?? undefined,
-  avatarTheme: (profileRow.avatar_theme as Profile['avatarTheme']) ?? 'mint',
-  medications:
-    typeof preferenceRow?.medications_text === 'string'
-      ? preferenceRow.medications_text
-          .split(',')
-          .map((value) => value.trim())
-          .filter(Boolean)
-      : [],
-  diagnoses:
-    typeof preferenceRow?.symptoms_text === 'string'
-      ? preferenceRow.symptoms_text
-          .split(',')
-          .map((value) => value.trim())
-          .filter(Boolean)
-      : [],
-  smokingHabits: (preferenceRow?.smoking_habits as string | null) ?? undefined,
-  drinkingHabits: (preferenceRow?.drinking_habits as string | null) ?? undefined,
-  menstrualSupportEnabled: Boolean(profileRow.menstrual_support_enabled),
-  privacyAcceptedAt: (profileRow.privacy_accepted_at as string | null) ?? undefined,
-  aiDisclaimerAcceptedAt: (profileRow.ai_disclaimer_accepted_at as string | null) ?? undefined,
-  crisisDisclaimerAcceptedAt: (profileRow.crisis_disclaimer_accepted_at as string | null) ?? undefined,
-  onboardingComplete: Boolean(profileRow.onboarding_complete),
-});
+): Promise<Profile> => {
+  const storedAvatar = parseStoredAvatarValue((profileRow.avatar_url as string | null) ?? undefined);
+  const avatarUrl =
+    storedAvatar.avatarPath && supabase
+      ? (
+          await supabase.storage
+            .from('avatars')
+            .createSignedUrl(storedAvatar.avatarPath, avatarSignedUrlTtlSeconds)
+        ).data?.signedUrl ?? storedAvatar.directUrl
+      : storedAvatar.directUrl;
+
+  return {
+    id: String(profileRow.id),
+    email: String(profileRow.email ?? ''),
+    fullName: String(profileRow.full_name ?? 'BubbleAI User'),
+    displayName: String(profileRow.display_name ?? 'Friend'),
+    pronouns: (profileRow.pronouns as string | null) ?? undefined,
+    birthYear: (profileRow.birth_year as number | null) ?? undefined,
+    genderIdentity: (profileRow.gender_identity as string | null) ?? undefined,
+    preferredVoice: (profileRow.preferred_voice as Profile['preferredVoice']) ?? 'neutral_calm',
+    avatarPath: storedAvatar.avatarPath,
+    avatarUrl,
+    avatarTheme: (profileRow.avatar_theme as Profile['avatarTheme']) ?? 'mint',
+    medications:
+      typeof preferenceRow?.medications_text === 'string'
+        ? preferenceRow.medications_text
+            .split(',')
+            .map((value) => value.trim())
+            .filter(Boolean)
+        : [],
+    diagnoses:
+      typeof preferenceRow?.symptoms_text === 'string'
+        ? preferenceRow.symptoms_text
+            .split(',')
+            .map((value) => value.trim())
+            .filter(Boolean)
+        : [],
+    smokingHabits: (preferenceRow?.smoking_habits as string | null) ?? undefined,
+    drinkingHabits: (preferenceRow?.drinking_habits as string | null) ?? undefined,
+    menstrualSupportEnabled: Boolean(profileRow.menstrual_support_enabled),
+    privacyAcceptedAt: (profileRow.privacy_accepted_at as string | null) ?? undefined,
+    aiDisclaimerAcceptedAt: (profileRow.ai_disclaimer_accepted_at as string | null) ?? undefined,
+    crisisDisclaimerAcceptedAt: (profileRow.crisis_disclaimer_accepted_at as string | null) ?? undefined,
+    onboardingComplete: Boolean(profileRow.onboarding_complete),
+  };
+};
 
 const mapCycleProfile = (row: Record<string, unknown> | null | undefined): CycleProfile | null => {
   if (!row) {
@@ -782,7 +796,7 @@ export const dataService = {
       return null;
     }
 
-    const profile = mapProfileWithPreferences(profileRow, preferenceRow);
+    const profile = await mapProfileWithPreferences(profileRow, preferenceRow);
     const session = useAppStore.getState().session;
     if (session) {
       useAppStore.getState().hydrateLiveSession(
@@ -790,6 +804,7 @@ export const dataService = {
           ...session,
           fullName: profile.fullName,
           displayName: profile.displayName,
+          avatarPath: profile.avatarPath,
           avatarUrl: profile.avatarUrl,
           avatarTheme: profile.avatarTheme,
           onboardingComplete: profile.onboardingComplete,
@@ -807,6 +822,7 @@ export const dataService = {
     birthYear?: number;
     genderIdentity?: string;
     preferredVoice: Profile['preferredVoice'];
+    avatarPath?: string;
     avatarTheme?: Profile['avatarTheme'];
     avatarUrl?: string;
     smokingHabits?: string;
@@ -828,6 +844,7 @@ export const dataService = {
         birthYear: input.birthYear,
         genderIdentity: input.genderIdentity,
         preferredVoice: input.preferredVoice,
+        avatarPath: input.avatarPath ?? profile.avatarPath,
         avatarTheme: input.avatarTheme ?? profile.avatarTheme ?? 'mint',
         avatarUrl: input.avatarUrl ?? profile.avatarUrl,
         smokingHabits: input.smokingHabits,
@@ -854,6 +871,7 @@ export const dataService = {
           }),
           fullName: nextProfile.fullName,
           displayName: nextProfile.displayName,
+          avatarPath: nextProfile.avatarPath,
           avatarTheme: nextProfile.avatarTheme,
           avatarUrl: nextProfile.avatarUrl,
         },
@@ -882,7 +900,7 @@ export const dataService = {
         gender_identity: input.genderIdentity,
         preferred_voice: input.preferredVoice,
         avatar_theme: input.avatarTheme ?? 'mint',
-        avatar_url: input.avatarUrl ?? null,
+        avatar_url: input.avatarPath ?? null,
       }),
       supabase.from('preferences').upsert({
         user_id: userId,
@@ -919,13 +937,14 @@ export const dataService = {
               displayName: profile.displayName,
               onboardingComplete: profile.onboardingComplete,
             }),
+            avatarPath: localUri,
             avatarUrl: localUri,
             avatarTheme: profile.avatarTheme,
           },
-          { ...profile, avatarUrl: localUri },
+          { ...profile, avatarPath: localUri, avatarUrl: localUri },
         );
       }
-      return localUri;
+      return { avatarPath: localUri, avatarUrl: localUri };
     }
 
     if (!supabase) {
@@ -958,8 +977,15 @@ export const dataService = {
       throw uploadError;
     }
 
-    const { data } = supabase.storage.from('avatars').getPublicUrl(filePath);
-    return data.publicUrl;
+    const { data, error: signedUrlError } = await supabase.storage
+      .from('avatars')
+      .createSignedUrl(filePath, avatarSignedUrlTtlSeconds);
+
+    if (signedUrlError || !data?.signedUrl) {
+      throw signedUrlError ?? new Error('BubbleAI could not prepare that photo yet.');
+    }
+
+    return { avatarPath: filePath, avatarUrl: data.signedUrl };
   },
 
   async getMedicalId(): Promise<MedicalId | null> {

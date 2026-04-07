@@ -49,6 +49,9 @@ Mobile:
 
 Server only, for Supabase secrets or local functions:
 
+- Copy `.env.server.example` into a server-only location if you need local Supabase function development.
+- Do not place these values in `.env.local` for the Expo app.
+
 - `OPENAI_API_KEY`
 - `OPENAI_TEXT_MODEL`
 - `OPENAI_REALTIME_MODEL`
@@ -81,6 +84,8 @@ EXPO_PUBLIC_APP_ENV=mock
 ```
 
 Use `mock` for the fastest first run. Switch to `live` only when you want the app talking to your linked Supabase backend.
+
+If you need local Supabase function work, keep server-only secrets in a separate file based on `.env.server.example` instead of loading them into the Expo app environment.
 
 3. Build the dev client
 

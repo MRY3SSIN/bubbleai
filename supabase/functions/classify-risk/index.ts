@@ -18,16 +18,8 @@ Deno.serve(async (request) => {
 
     const response = await createResponse({
       model: serverEnv.openAiTextModel,
-      input: [
-        {
-          role: 'system',
-          content: [{ type: 'input_text', text: bubbleSafetyDeveloperPrompt }],
-        },
-        {
-          role: 'user',
-          content: [{ type: 'input_text', text: `Classify the risk of this content:\n${content}` }],
-        },
-      ],
+      instructions: bubbleSafetyDeveloperPrompt,
+      input: `Classify the risk of this content:\n${content}`,
       text: {
         format: {
           type: 'json_schema',
