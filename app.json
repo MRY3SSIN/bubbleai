@@ -65,7 +65,8 @@
           "defaultChannel": "bubbleai-reminders",
           "sounds": []
         }
-      ]
+      ],
+      "expo-asset"
     ],
     "experiments": {
       "typedRoutes": true
